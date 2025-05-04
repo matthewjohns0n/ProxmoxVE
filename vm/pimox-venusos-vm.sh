@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-# Copyright (c) 2025
+# Copyright (c) 2025 matthewjohns0n
+# Author: Matt Johnson (matthewjohns0n)
 # License: MIT
+# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
 source /dev/stdin <<<$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/api.func)
 
