@@ -425,8 +425,8 @@ qm importdisk $VMID "$QCOW2_FILE" $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 # Add the disk to the VM
 qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
 
-# Set machine to virt with specific ARM-compatible options
-qm set $VMID -machine virt,gic-version=3 >/dev/null
+# Set machine to virt with specific ARM-compatible options that suppress the PIIX errors
+qm set $VMID -machine virt,gic-version=3,accel=tcg >/dev/null
 
 # Set architecture to aarch64
 qm set $VMID -arch aarch64 >/dev/null
@@ -480,14 +480,34 @@ if [ -f "$VM_CONFIG" ]; then
     sed -i '/^args:/d' "$VM_CONFIG"
   fi
 
+  # Fix scsi0 line if it has a drive_format property
+  if grep -q "scsi0.*drive_format" "$VM_CONFIG"; then
+    sed -i 's/,drive_format=qcow2//g' "$VM_CONFIG"
+  fi
+
   # Add kernel boot parameters to directly boot the disk
-  echo "bootdisk: scsi0" >> "$VM_CONFIG"
+  if ! grep -q "^bootdisk:" "$VM_CONFIG"; then
+    echo "bootdisk: scsi0" >> "$VM_CONFIG"
+  fi
+
+  # Add args to suppress PIIX warnings
+  echo "args: -global PIIX4_PM.disable_s3=0 -global PIIX4_PM.disable_s4=0" >> "$VM_CONFIG"
 
   msg_ok "VM configuration adjusted for ARM emulation"
 fi
 
 if [ "$START_VM" == "yes" ]; then
   msg_info "Starting VenusOS VM"
+
+  # Final check - make sure there are no drive_format entries in any config lines
+  if [ -f "$VM_CONFIG" ]; then
+    if grep -q "drive_format" "$VM_CONFIG"; then
+      msg_info "Removing problematic drive_format parameters"
+      sed -i 's/,drive_format=[^,]*//g' "$VM_CONFIG"
+      msg_ok "Fixed configuration"
+    fi
+  fi
+
   qm start $VMID
   msg_ok "Started VenusOS VM"
 fi
@@ -496,3 +516,28 @@ msg_ok "Completed Successfully!\n"
 echo -e "\n${BL}Note: Venus OS is now running in ARM emulation mode."
 echo -e "The default login for VenusOS is username: 'root' with no password."
 echo -e "VM console is available via serial console in Proxmox web interface.${CL}\n"
+
+# Add option to run diagnostics if needed
+if [ "$1" == "--diagnose" ]; then
+  echo -e "${YW}Running diagnostic checks...${CL}"
+  diagnostic_info
+fi
+
+function diagnostic_info() {
+  # Display qemu-system-aarch64 version
+  echo -e "${BL}QEMU version:${CL}"
+  qemu-system-aarch64 --version
+
+  # Check for ARM firmware
+  echo -e "${BL}ARM firmware files:${CL}"
+  ls -la /usr/share/pve-edk2-firmware/ | grep -i arm
+
+  # Display Proxmox architecture
+  echo -e "${BL}System architecture:${CL}"
+  uname -a
+  dpkg --print-architecture
+
+  # Display Proxmox version
+  echo -e "${BL}Proxmox version:${CL}"
+  pveversion -v
+}
