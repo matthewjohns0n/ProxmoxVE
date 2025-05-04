@@ -425,11 +425,14 @@ qm importdisk $VMID "$QCOW2_FILE" $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 # Add the disk to the VM
 qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
 
-# Set machine to virt (for ARM support)
-qm set $VMID -machine virt >/dev/null
+# Set machine to virt with specific ARM-compatible options
+qm set $VMID -machine virt,gic-version=3 >/dev/null
 
 # Set architecture to aarch64
 qm set $VMID -arch aarch64 >/dev/null
+
+# Set CPU to cortex-a72 (RPi4 CPU)
+qm set $VMID -cpu cortex-a72 >/dev/null
 
 # Configure serial console for output
 qm set $VMID -serial0 socket >/dev/null
@@ -467,11 +470,6 @@ if [ -f "$VM_CONFIG" ]; then
     sed -i '/^cpu:/d' "$VM_CONFIG"
   fi
 
-  # Add drive_format for qcow2
-  if grep -q "^scsi0:" "$VM_CONFIG" && ! grep -q "drive_format=qcow2" "$VM_CONFIG"; then
-    sed -i 's/\(scsi0: .*\)/\1,drive_format=qcow2/g' "$VM_CONFIG"
-  fi
-
   # Ensure arch line exists
   if ! grep -q "^arch:" "$VM_CONFIG"; then
     echo "arch: aarch64" >> "$VM_CONFIG"
@@ -481,6 +479,9 @@ if [ -f "$VM_CONFIG" ]; then
   if grep -q "^args:" "$VM_CONFIG"; then
     sed -i '/^args:/d' "$VM_CONFIG"
   fi
+
+  # Add kernel boot parameters to directly boot the disk
+  echo "bootdisk: scsi0" >> "$VM_CONFIG"
 
   msg_ok "VM configuration adjusted for ARM emulation"
 fi
