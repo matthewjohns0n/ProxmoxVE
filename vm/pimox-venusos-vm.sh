@@ -95,9 +95,17 @@ fi
 function ARCH_CHECK() {
   ARCH=$(dpkg --print-architecture)
   if [[ "$ARCH" == "amd64" ]]; then
-    echo -e "\n ⚠️  This script works with ARM architecture! \n"
+    echo -e "\n${RD}⚠️  WARNING: This script uses a Raspberry Pi image designed for ARM architecture!${CL}"
+    echo -e "${YW}Running on AMD64/x86_64 may not work properly. For best results, run on ARM hardware.${CL}\n"
     if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "Architecture Warning" --yesno "This script is designed for ARM architecture. Continue anyway?" 10 58); then
       echo "User selected to continue with AMD64 architecture"
+
+      if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "Platform Warning" --yesno "Would you like to download an x86 image instead? (Experimental)" 10 58); then
+        echo -e "${YW}Using x86 image instead of ARM${CL}"
+        URL=https://updates.victronenergy.com/feeds/venus/release/images/ccgx/venus-image-large-ccgx.wic.gz
+      else
+        echo -e "${YW}Continuing with ARM image on x86 platform (may not boot)${CL}"
+      fi
     else
       echo -e "Exiting..."
       sleep 2
@@ -258,6 +266,10 @@ function START_SCRIPT() {
 ARCH_CHECK
 START_SCRIPT
 post_to_api_vm
+
+# Set default URL (ARM image)
+URL=https://updates.victronenergy.com/feeds/venus/release/images/raspberrypi4/venus-image-large-raspberrypi4.wic.gz
+
 while read -r line; do
   TAG=$(echo $line | awk '{print $1}')
   TYPE=$(echo $line | awk '{printf "%-10s", $2}')
@@ -285,7 +297,6 @@ fi
 msg_ok "Using ${CL}${BL}$STORAGE${CL} ${GN}for Storage Location."
 msg_ok "Virtual Machine ID is ${CL}${BL}$VMID${CL}."
 msg_info "Getting URL for VenusOS Disk Image"
-URL=https://updates.victronenergy.com/feeds/venus/release/images/raspberrypi4/venus-image-large-raspberrypi4.wic.gz
 sleep 2
 msg_ok "${CL}${BL}${URL}${CL}"
 curl -f#SL -o "$(basename "$URL")" "$URL"
@@ -307,19 +318,18 @@ nfs | dir)
   DISK_IMPORT="-format qcow2"
   ;;
 esac
-for i in {0,1}; do
-  disk="DISK$i"
-  eval DISK${i}=vm-${VMID}-disk-${i}${DISK_EXT:-}
-  eval DISK${i}_REF=${STORAGE}:${DISK_REF:-}${!disk}
-done
+
+# Simplify to single disk setup
+DISK0=vm-${VMID}-disk-0${DISK_EXT:-}
+DISK0_REF=${STORAGE}:${DISK_REF:-}${DISK0}
+
 msg_info "Creating VenusOS VM"
-qm create $VMID -bios ovmf -cores $CORE_COUNT -memory $RAM_SIZE -name $HN \
+qm create $VMID -boot c -bootdisk scsi0 -cores $CORE_COUNT -memory $RAM_SIZE -name $HN \
   -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
-pvesm alloc $STORAGE $VMID $DISK0 64M 1>&/dev/null
+pvesm alloc $STORAGE $VMID $DISK0 $DISK_SIZE 1>&/dev/null
 qm importdisk $VMID venus-image-raspberrypi4.qcow2 $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 qm set $VMID \
-  -efidisk0 ${DISK0_REF},efitype=4m,size=64M \
-  -scsi0 ${DISK1_REF},size=32G >/dev/null
+  -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
 qm set $VMID \
   -boot order=scsi0 \
   -description "<div align='center'>
