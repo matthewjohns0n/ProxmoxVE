@@ -382,34 +382,51 @@ esac
 DISK0=vm-${VMID}-disk-0${DISK_EXT:-}
 DISK0_REF=${STORAGE}:${DISK_REF:-}${DISK0}
 
-# The critical part: Create a basic ARM VM with correct settings
-msg_info "Creating ARM-based VenusOS VM"
+# Step 1: Create the basic VM with no disks or special settings
+msg_info "Creating base VM configuration"
 qm create $VMID \
-  -cores $CORE_COUNT \
-  -memory $RAM_SIZE \
   -name $HN \
+  -memory $RAM_SIZE \
+  -cores $CORE_COUNT \
   -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU \
   -onboot 1 \
   -ostype l26 \
   -scsihw virtio-scsi-pci
 
-# Import the disk
+# Step 2: Import the disk
+msg_info "Importing disk image"
 pvesm alloc $STORAGE $VMID $DISK0 $DISK_SIZE 1>&/dev/null
 qm importdisk $VMID "$QCOW2_FILE" $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
+
+# Step 3: Configure the VM for ARM
+msg_info "Configuring VM for ARM architecture"
+
+# Set the boot disk
 qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
-
-# Set the VM to ARM architecture
-qm set $VMID -arch aarch64 >/dev/null
-
-# Set the machine type to virt (required for ARM)
-qm set $VMID -machine virt >/dev/null
-
-# Set boot disk
 qm set $VMID -bootdisk scsi0 >/dev/null
 
-# Configure serial console
+# Set ARM-specific settings including architecture and machine type
+qm set $VMID -arch aarch64 >/dev/null
+qm set $VMID -machine virt >/dev/null
+qm set $VMID -bios ovmf >/dev/null
+
+# Create EFI disk with proper size - critical for ARM booting
+msg_info "Creating EFI disk for ARM boot"
+qm set $VMID --efidisk0 $STORAGE:1,efitype=4m,format=raw >/dev/null
+
+# Configure serial console (required for ARM VMs)
 qm set $VMID -serial0 socket >/dev/null
 qm set $VMID -vga serial0 >/dev/null
+
+# Manually edit the VM configuration file to remove problematic settings
+VM_CONF="/etc/pve/qemu-server/${VMID}.conf"
+if [ -f "$VM_CONF" ]; then
+  msg_info "Fine-tuning VM configuration"
+  # Remove any CPU type setting as it can interfere with ARM emulation
+  sed -i '/^cpu:/d' "$VM_CONF"
+  # Comment out vmgenid as it can cause issues with ARM VMs
+  sed -i 's/^vmgenid:/#vmgenid:/' "$VM_CONF"
+fi
 
 msg_ok "Created VenusOS VM"
 
@@ -423,13 +440,15 @@ post_update_to_api "done" "none"
 msg_ok "Completed Successfully!\n"
 echo -e "\n${BL}Note: Venus OS is running in ARM emulation mode."
 echo -e "The default login for VenusOS is username: 'root' with no password."
-echo -e "VM console is available via serial console in Proxmox web interface.${CL}\n"
+echo -e "VM console is available via serial console in Proxmox web interface."
+echo -e "If you experience boot issues, check the VM configuration file at /etc/pve/qemu-server/${VMID}.conf"
+echo -e "For troubleshooting, verify that arch: aarch64 is set and cpu: line is removed.${CL}\n"
 
 # Save the files to the persistent directory
 if [ -f "$FILE" ]; then
   msg_info "Saving compressed image to $IMAGE_DIR"
   cp "$FILE" "$IMAGE_DIR/"
-  msg_ok "Saved extracted image to $IMAGE_DIR/$FILE"
+  msg_ok "Saved compressed image to $IMAGE_DIR/$FILE"
 fi
 
 if [ -f "$EXTRACTED_FILE" ]; then
