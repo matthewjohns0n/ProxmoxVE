@@ -279,16 +279,17 @@ function advanced_settings() {
 
 function download_venus_image() {
   msg_info "Downloading VenusOS image"
-  wget -q --show-progress $VENUS_IMAGE_URL -O $TEMP_DIR/venus.wic.gz
-  if [ $? -ne 0 ]; then
-    msg_error "Failed to download VenusOS image"
-    echo -e "Please check your internet connection or the image URL"
-    exit 1
-  fi
-  msg_ok "VenusOS image downloaded"
+  # wget -q --show-progress $VENUS_IMAGE_URL -O $TEMP_DIR/venus.wic.gz
+  # if [ $? -ne 0 ]; then
+  #   msg_error "Failed to download VenusOS image"
+  #   echo -e "Please check your internet connection or the image URL"
+  #   exit 1
+  # fi
+  # msg_ok "VenusOS image downloaded"
 
   msg_info "Extracting VenusOS image"
-  gunzip -f $TEMP_DIR/venus.wic.gz
+  cp /var/lib/vz/template/iso/venus/venus-image-large-raspberrypi4.wic $TEMP_DIR/venus.wic
+  # gunzip -f $TEMP_DIR/venus.wic.gz
   if [ $? -ne 0 ]; then
     msg_error "Failed to extract VenusOS image"
     exit 1
