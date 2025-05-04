@@ -278,7 +278,7 @@ function advanced_settings() {
 }
 
 function download_venus_image() {
-  msg_info "Downloading VenusOS image"
+  msg_info "[SKIPPING] Downloading VenusOS image"
   # wget -q --show-progress $VENUS_IMAGE_URL -O $TEMP_DIR/venus.wic.gz
   # if [ $? -ne 0 ]; then
   #   msg_error "Failed to download VenusOS image"
