@@ -321,17 +321,42 @@ msg_ok "Virtual Machine ID is ${CL}${BL}$VMID${CL}."
 msg_info "Getting URL for VenusOS Disk Image"
 sleep 2
 msg_ok "${CL}${BL}${URL}${CL}"
-curl -f#SL -o "$(basename "$URL")" "$URL"
-echo -en "\e[1A\e[0K"
+
+# Check if the file already exists locally
 FILE=$(basename $URL)
-msg_ok "Downloaded ${CL}${BL}venus-image-large-raspberrypi4.wic.gz${CL}"
-msg_info "Extracting Disk Image"
-gunzip $FILE
-NEW_FILE="${FILE%.gz}"
-msg_ok "Extracted Disk Image"
-msg_info "Converting disk format to qcow2"
-qemu-img convert -f raw -O qcow2 $NEW_FILE venus-image-raspberrypi4.qcow2
-msg_ok "Converted disk to qcow2 format"
+EXTRACTED_FILE="${FILE%.gz}"
+QCOW2_FILE="venus-image-raspberrypi4.qcow2"
+
+if [ -f "$FILE" ]; then
+  msg_ok "Found existing download ${CL}${BL}$FILE${CL}"
+elif [ -f "$EXTRACTED_FILE" ]; then
+  msg_ok "Found existing extracted image ${CL}${BL}$EXTRACTED_FILE${CL}"
+elif [ -f "$QCOW2_FILE" ]; then
+  msg_ok "Found existing converted image ${CL}${BL}$QCOW2_FILE${CL}"
+else
+  msg_info "Downloading VenusOS image"
+  curl -f#SL -o "$FILE" "$URL"
+  echo -en "\e[1A\e[0K"
+  msg_ok "Downloaded ${CL}${BL}$FILE${CL}"
+fi
+
+# Extract the image if needed
+if [ -f "$FILE" ] && [ ! -f "$EXTRACTED_FILE" ] && [ ! -f "$QCOW2_FILE" ]; then
+  msg_info "Extracting Disk Image"
+  gunzip "$FILE"
+  msg_ok "Extracted Disk Image"
+fi
+
+# Convert to qcow2 if needed
+if [ -f "$EXTRACTED_FILE" ] && [ ! -f "$QCOW2_FILE" ]; then
+  msg_info "Converting disk format to qcow2"
+  qemu-img convert -f raw -O qcow2 "$EXTRACTED_FILE" "$QCOW2_FILE"
+  msg_ok "Converted disk to qcow2 format"
+elif [ ! -f "$QCOW2_FILE" ]; then
+  msg_error "Required disk image not found. Exiting."
+  exit 1
+fi
+
 STORAGE_TYPE=$(pvesm status -storage $STORAGE | awk 'NR>1 {print $2}')
 case $STORAGE_TYPE in
 nfs | dir)
@@ -357,7 +382,7 @@ qm create $VMID -bios ovmf -cores $CORE_COUNT -memory $RAM_SIZE -name $HN \
 pvesm alloc $STORAGE $VMID $DISK0 $DISK_SIZE 1>&/dev/null
 
 # Import the disk image
-qm importdisk $VMID venus-image-raspberrypi4.qcow2 $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
+qm importdisk $VMID "$QCOW2_FILE" $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 
 # Add the disk to the VM
 qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
