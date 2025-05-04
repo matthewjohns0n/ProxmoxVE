@@ -388,7 +388,7 @@ qm importdisk $VMID "$QCOW2_FILE" $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
 
 # Create EFI disk
-qm set $VMID --efidisk0 ${STORAGE}:1,efitype=4m,format=raw >/dev/null
+qm set $VMID --efidisk0 ${STORAGE}:1,efitype=4m,size=4M,format=raw >/dev/null
 
 # Set boot order
 qm set $VMID \
