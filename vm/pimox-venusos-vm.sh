@@ -425,8 +425,8 @@ qm importdisk $VMID "$QCOW2_FILE" $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 # Add the disk to the VM
 qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
 
-# Create EFI disk
-qm set $VMID --efidisk0 ${STORAGE}:1,efitype=4m,size=4M,format=raw >/dev/null
+# DO NOT create EFI disk with standard commands - it causes size mismatch issues
+# Instead, we'll manually configure it in the VM config file
 
 # Set boot order
 qm set $VMID \
@@ -449,23 +449,37 @@ qm set $VMID -vga serial0 >/dev/null
 
 msg_ok "Created VenusOS VM ${CL}${BL}(${HN})"
 
-# Manually edit config file to remove vmgenid if needed
+# Manually edit config file for proper EFI setup
 VM_CONFIG="/etc/pve/qemu-server/${VMID}.conf"
 if [ -f "$VM_CONFIG" ]; then
-  msg_info "Adjusting VM configuration"
+  msg_info "Configuring VM for ARM emulation"
+
   # Comment out vmgenid if exists
   if grep -q "^vmgenid:" "$VM_CONFIG"; then
     sed -i 's/^vmgenid:/#vmgenid:/g' "$VM_CONFIG"
   fi
+
   # Remove cpu line if exists
   if grep -q "^cpu:" "$VM_CONFIG"; then
     sed -i '/^cpu:/d' "$VM_CONFIG"
   fi
+
   # Ensure arch line exists
   if ! grep -q "^arch:" "$VM_CONFIG"; then
     echo "arch: aarch64" >> "$VM_CONFIG"
   fi
-  msg_ok "VM configuration adjusted"
+
+  # Add proper EFI firmware configuration
+  if ! grep -q "^efidisk0:" "$VM_CONFIG"; then
+    # Create a small raw EFI file first
+    EFI_RAW_FILE="/var/lib/vz/template/iso/venus/efi_${VMID}.raw"
+    dd if=/dev/zero of="$EFI_RAW_FILE" bs=1M count=4 >/dev/null 2>&1
+
+    # Add it to config with proper size
+    echo "efidisk0: file=$EFI_RAW_FILE,format=raw,size=4M,pre-enrolled-keys=0" >> "$VM_CONFIG"
+  fi
+
+  msg_ok "VM configuration adjusted for ARM emulation"
 fi
 
 if [ "$START_VM" == "yes" ]; then
