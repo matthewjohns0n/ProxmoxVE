@@ -76,6 +76,30 @@ function cleanup_vmid() {
 }
 function cleanup() {
   popd >/dev/null
+
+  # Move important files to a persistent directory if they exist
+  IMAGE_DIR="/var/lib/vz/template/iso/venus"
+  mkdir -p $IMAGE_DIR
+
+  if [ -f "$TEMP_DIR/$FILE" ]; then
+    msg_info "Saving compressed image to $IMAGE_DIR"
+    cp "$TEMP_DIR/$FILE" "$IMAGE_DIR/"
+    msg_ok "Saved compressed image to $IMAGE_DIR/$FILE"
+  fi
+
+  if [ -f "$TEMP_DIR/$EXTRACTED_FILE" ]; then
+    msg_info "Saving extracted image to $IMAGE_DIR"
+    cp "$TEMP_DIR/$EXTRACTED_FILE" "$IMAGE_DIR/"
+    msg_ok "Saved extracted image to $IMAGE_DIR/$EXTRACTED_FILE"
+  fi
+
+  if [ -f "$TEMP_DIR/$QCOW2_FILE" ]; then
+    msg_info "Saving qcow2 image to $IMAGE_DIR"
+    cp "$TEMP_DIR/$QCOW2_FILE" "$IMAGE_DIR/"
+    msg_ok "Saved qcow2 image to $IMAGE_DIR/$QCOW2_FILE"
+  fi
+
+  # Remove temporary directory
   rm -rf $TEMP_DIR
 }
 TEMP_DIR=$(mktemp -d)
@@ -292,6 +316,10 @@ post_to_api_vm
 # Set default URL (ARM image)
 URL=https://updates.victronenergy.com/feeds/venus/release/images/raspberrypi4/venus-image-large-raspberrypi4.wic.gz
 
+# Define image directory
+IMAGE_DIR="/var/lib/vz/template/iso/venus"
+mkdir -p $IMAGE_DIR
+
 while read -r line; do
   TAG=$(echo $line | awk '{print $1}')
   TYPE=$(echo $line | awk '{printf "%-10s", $2}')
@@ -327,12 +355,22 @@ FILE=$(basename $URL)
 EXTRACTED_FILE="${FILE%.gz}"
 QCOW2_FILE="venus-image-raspberrypi4.qcow2"
 
+# Check in the current directory and persistent directory
 if [ -f "$FILE" ]; then
   msg_ok "Found existing download ${CL}${BL}$FILE${CL}"
 elif [ -f "$EXTRACTED_FILE" ]; then
   msg_ok "Found existing extracted image ${CL}${BL}$EXTRACTED_FILE${CL}"
 elif [ -f "$QCOW2_FILE" ]; then
   msg_ok "Found existing converted image ${CL}${BL}$QCOW2_FILE${CL}"
+elif [ -f "$IMAGE_DIR/$FILE" ]; then
+  msg_ok "Found existing download in $IMAGE_DIR"
+  cp "$IMAGE_DIR/$FILE" .
+elif [ -f "$IMAGE_DIR/$EXTRACTED_FILE" ]; then
+  msg_ok "Found existing extracted image in $IMAGE_DIR"
+  cp "$IMAGE_DIR/$EXTRACTED_FILE" .
+elif [ -f "$IMAGE_DIR/$QCOW2_FILE" ]; then
+  msg_ok "Found existing converted image in $IMAGE_DIR"
+  cp "$IMAGE_DIR/$QCOW2_FILE" .
 else
   msg_info "Downloading VenusOS image"
   curl -f#SL -o "$FILE" "$URL"
