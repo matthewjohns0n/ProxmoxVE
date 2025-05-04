@@ -92,27 +92,49 @@ else
   echo -e "⚠ User exited script \n"
   exit
 fi
-function ARCH_CHECK() {
-  ARCH=$(dpkg --print-architecture)
-  if [[ "$ARCH" == "amd64" ]]; then
-    echo -e "\n${RD}⚠️  WARNING: This script uses a Raspberry Pi image designed for ARM architecture!${CL}"
-    echo -e "${YW}Running on AMD64/x86_64 may not work properly. For best results, run on ARM hardware.${CL}\n"
-    if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "Architecture Warning" --yesno "This script is designed for ARM architecture. Continue anyway?" 10 58); then
-      echo "User selected to continue with AMD64 architecture"
 
-      if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "Platform Warning" --yesno "Would you like to download an x86 image instead? (Experimental)" 10 58); then
-        echo -e "${YW}Using x86 image instead of ARM${CL}"
-        URL=https://updates.victronenergy.com/feeds/venus/release/images/ccgx/venus-image-large-ccgx.wic.gz
-      else
-        echo -e "${YW}Continuing with ARM image on x86 platform (may not boot)${CL}"
+function check_arm_support() {
+  # Check if necessary firmware package is installed
+  if ! dpkg -l | grep -q pve-edk2-firmware-aarch64; then
+    echo -e "${RD}⚠️  Missing ARM64 firmware package for QEMU${CL}"
+    echo -e "${YW}Installing required package: pve-edk2-firmware-aarch64${CL}"
+    if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "ARM Firmware Missing" --yesno "ARM emulation requires the pve-edk2-firmware-aarch64 package.\nInstall it now?" 10 58); then
+      apt-get update
+      apt-get install -y pve-edk2-firmware-aarch64
+      if [ $? -ne 0 ]; then
+        echo -e "${RD}Failed to install ARM firmware. You may need to add testing repository:${CL}"
+        echo -e "${YW}echo 'deb http://download.proxmox.com/debian/pve bookworm pvetest' >> /etc/apt/sources.list${CL}"
+        echo -e "${YW}apt-get update${CL}"
+        if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "Add Testing Repo?" --yesno "Add Proxmox testing repository to install ARM firmware?" 10 58); then
+          echo 'deb http://download.proxmox.com/debian/pve bookworm pvetest' >> /etc/apt/sources.list
+          apt-get update
+          apt-get install -y pve-edk2-firmware-aarch64
+          if [ $? -ne 0 ]; then
+            echo -e "${RD}Failed to install ARM firmware. Exiting.${CL}"
+            exit 1
+          fi
+        else
+          echo -e "${RD}Cannot continue without ARM firmware support. Exiting.${CL}"
+          exit 1
+        fi
       fi
     else
-      echo -e "Exiting..."
-      sleep 2
-      exit
+      echo -e "${RD}Cannot continue without ARM firmware support. Exiting.${CL}"
+      exit 1
     fi
   fi
 }
+
+function ARCH_CHECK() {
+  ARCH=$(dpkg --print-architecture)
+  if [[ "$ARCH" == "amd64" ]]; then
+    echo -e "\n${YW}Running on AMD64/x86_64 hardware - will emulate ARM architecture for Raspberry Pi image.${CL}\n"
+    check_arm_support
+  else
+    echo -e "\n${GN}Running on $ARCH hardware${CL}\n"
+  fi
+}
+
 function msg_info() {
   local msg="$1"
   echo -ne " ${HOLD} ${YW}${msg}..."
@@ -323,13 +345,27 @@ esac
 DISK0=vm-${VMID}-disk-0${DISK_EXT:-}
 DISK0_REF=${STORAGE}:${DISK_REF:-}${DISK0}
 
+# Create EFI Disk
+EFI_DISK=vm-${VMID}-disk-1${DISK_EXT:-}
+EFI_DISK_REF=${STORAGE}:${DISK_REF:-}${EFI_DISK}
+
 msg_info "Creating VenusOS VM"
-qm create $VMID -boot c -bootdisk scsi0 -cores $CORE_COUNT -memory $RAM_SIZE -name $HN \
+qm create $VMID -bios ovmf -cores $CORE_COUNT -memory $RAM_SIZE -name $HN \
   -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
+
+# Allocate main disk for the VM
 pvesm alloc $STORAGE $VMID $DISK0 $DISK_SIZE 1>&/dev/null
+
+# Import the disk image
 qm importdisk $VMID venus-image-raspberrypi4.qcow2 $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
-qm set $VMID \
-  -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
+
+# Add the disk to the VM
+qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
+
+# Create EFI disk
+qm set $VMID --efidisk0 ${STORAGE}:1,efitype=4m,format=raw >/dev/null
+
+# Set boot order
 qm set $VMID \
   -boot order=scsi0 \
   -description "<div align='center'>
@@ -337,7 +373,38 @@ qm set $VMID \
 
   Victron Energy Venus OS - Energy Management System
   </div>" >/dev/null
+
+# Set machine to virt (for ARM support)
+qm set $VMID -machine virt >/dev/null
+
+# Set architecture to aarch64
+qm set $VMID -arch aarch64 >/dev/null
+
+# Configure serial console
+qm set $VMID -serial0 socket >/dev/null
+qm set $VMID -vga serial0 >/dev/null
+
 msg_ok "Created VenusOS VM ${CL}${BL}(${HN})"
+
+# Manually edit config file to remove vmgenid if needed
+VM_CONFIG="/etc/pve/qemu-server/${VMID}.conf"
+if [ -f "$VM_CONFIG" ]; then
+  msg_info "Adjusting VM configuration"
+  # Comment out vmgenid if exists
+  if grep -q "^vmgenid:" "$VM_CONFIG"; then
+    sed -i 's/^vmgenid:/#vmgenid:/g' "$VM_CONFIG"
+  fi
+  # Remove cpu line if exists
+  if grep -q "^cpu:" "$VM_CONFIG"; then
+    sed -i '/^cpu:/d' "$VM_CONFIG"
+  fi
+  # Ensure arch line exists
+  if ! grep -q "^arch:" "$VM_CONFIG"; then
+    echo "arch: aarch64" >> "$VM_CONFIG"
+  fi
+  msg_ok "VM configuration adjusted"
+fi
+
 if [ "$START_VM" == "yes" ]; then
   msg_info "Starting VenusOS VM"
   qm start $VMID
@@ -345,5 +412,6 @@ if [ "$START_VM" == "yes" ]; then
 fi
 post_update_to_api "done" "none"
 msg_ok "Completed Successfully!\n"
-echo -e "\n${BL}Note: For VenusOS on Proxmox, you may need to configure additional settings or drivers."
-echo -e "The default login for VenusOS is username: 'root' with no password.${CL}\n"
+echo -e "\n${BL}Note: Venus OS is now running in ARM emulation mode."
+echo -e "The default login for VenusOS is username: 'root' with no password."
+echo -e "VM console is available via serial console in Proxmox web interface.${CL}\n"
