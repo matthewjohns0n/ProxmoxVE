@@ -76,30 +76,6 @@ function cleanup_vmid() {
 }
 function cleanup() {
   popd >/dev/null
-
-  # Move important files to a persistent directory if they exist
-  IMAGE_DIR="/var/lib/vz/template/iso/venus"
-  mkdir -p $IMAGE_DIR
-
-  if [ -f "$TEMP_DIR/$FILE" ]; then
-    msg_info "Saving compressed image to $IMAGE_DIR"
-    cp "$TEMP_DIR/$FILE" "$IMAGE_DIR/"
-    msg_ok "Saved compressed image to $IMAGE_DIR/$FILE"
-  fi
-
-  if [ -f "$TEMP_DIR/$EXTRACTED_FILE" ]; then
-    msg_info "Saving extracted image to $IMAGE_DIR"
-    cp "$TEMP_DIR/$EXTRACTED_FILE" "$IMAGE_DIR/"
-    msg_ok "Saved extracted image to $IMAGE_DIR/$EXTRACTED_FILE"
-  fi
-
-  if [ -f "$TEMP_DIR/$QCOW2_FILE" ]; then
-    msg_info "Saving qcow2 image to $IMAGE_DIR"
-    cp "$TEMP_DIR/$QCOW2_FILE" "$IMAGE_DIR/"
-    msg_ok "Saved qcow2 image to $IMAGE_DIR/$QCOW2_FILE"
-  fi
-
-  # Remove temporary directory
   rm -rf $TEMP_DIR
 }
 TEMP_DIR=$(mktemp -d)
@@ -313,9 +289,6 @@ ARCH_CHECK
 START_SCRIPT
 post_to_api_vm
 
-# Set default URL (ARM image)
-URL=https://updates.victronenergy.com/feeds/venus/release/images/raspberrypi4/venus-image-large-raspberrypi4.wic.gz
-
 # Define image directory
 IMAGE_DIR="/var/lib/vz/template/iso/venus"
 mkdir -p $IMAGE_DIR
@@ -347,6 +320,7 @@ fi
 msg_ok "Using ${CL}${BL}$STORAGE${CL} ${GN}for Storage Location."
 msg_ok "Virtual Machine ID is ${CL}${BL}$VMID${CL}."
 msg_info "Getting URL for VenusOS Disk Image"
+URL=https://updates.victronenergy.com/feeds/venus/release/images/raspberrypi4/venus-image-large-raspberrypi4.wic.gz
 sleep 2
 msg_ok "${CL}${BL}${URL}${CL}"
 
@@ -408,136 +382,64 @@ esac
 DISK0=vm-${VMID}-disk-0${DISK_EXT:-}
 DISK0_REF=${STORAGE}:${DISK_REF:-}${DISK0}
 
-# Create EFI Disk
-EFI_DISK=vm-${VMID}-disk-1${DISK_EXT:-}
-EFI_DISK_REF=${STORAGE}:${DISK_REF:-}${EFI_DISK}
+# The critical part: Create a basic ARM VM with correct settings
+msg_info "Creating ARM-based VenusOS VM"
+qm create $VMID \
+  -cores $CORE_COUNT \
+  -memory $RAM_SIZE \
+  -name $HN \
+  -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU \
+  -onboot 1 \
+  -ostype l26 \
+  -scsihw virtio-scsi-pci
 
-msg_info "Creating VenusOS VM with ARM emulation (non-UEFI)"
-qm create $VMID -cores $CORE_COUNT -memory $RAM_SIZE -name $HN \
-  -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
-
-# Allocate main disk for the VM
+# Import the disk
 pvesm alloc $STORAGE $VMID $DISK0 $DISK_SIZE 1>&/dev/null
-
-# Import the disk image
 qm importdisk $VMID "$QCOW2_FILE" $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
-
-# Add the disk to the VM
 qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
 
-# Set machine to virt with specific ARM-compatible options that suppress the PIIX errors
-qm set $VMID -machine virt,gic-version=3,accel=tcg >/dev/null
-
-# Set architecture to aarch64
+# Set the VM to ARM architecture
 qm set $VMID -arch aarch64 >/dev/null
 
-# Set CPU to cortex-a72 (RPi4 CPU)
-qm set $VMID -cpu cortex-a72 >/dev/null
+# Set the machine type to virt (required for ARM)
+qm set $VMID -machine virt >/dev/null
 
-# Configure serial console for output
+# Set boot disk
+qm set $VMID -bootdisk scsi0 >/dev/null
+
+# Configure serial console
 qm set $VMID -serial0 socket >/dev/null
 qm set $VMID -vga serial0 >/dev/null
 
-msg_ok "Created VenusOS VM ${CL}${BL}(${HN})"
-
-# Manually edit config file for proper ARM emulation
-VM_CONFIG="/etc/pve/qemu-server/${VMID}.conf"
-if [ -f "$VM_CONFIG" ]; then
-  msg_info "Configuring VM for ARM emulation (non-UEFI mode)"
-
-  # Comment out vmgenid if exists
-  if grep -q "^vmgenid:" "$VM_CONFIG"; then
-    sed -i 's/^vmgenid:/#vmgenid:/g' "$VM_CONFIG"
-  fi
-
-  # Remove any bios line if exists
-  if grep -q "^bios:" "$VM_CONFIG"; then
-    sed -i '/^bios:/d' "$VM_CONFIG"
-  fi
-
-  # Remove any boot order
-  if grep -q "^boot:" "$VM_CONFIG"; then
-    sed -i '/^boot:/d' "$VM_CONFIG"
-  fi
-
-  # Remove any efidisk if exists
-  if grep -q "^efidisk0:" "$VM_CONFIG"; then
-    sed -i '/^efidisk0:/d' "$VM_CONFIG"
-  fi
-
-  # Remove cpu line if exists
-  if grep -q "^cpu:" "$VM_CONFIG"; then
-    sed -i '/^cpu:/d' "$VM_CONFIG"
-  fi
-
-  # Ensure arch line exists
-  if ! grep -q "^arch:" "$VM_CONFIG"; then
-    echo "arch: aarch64" >> "$VM_CONFIG"
-  fi
-
-  # Remove any pflash or args settings
-  if grep -q "^args:" "$VM_CONFIG"; then
-    sed -i '/^args:/d' "$VM_CONFIG"
-  fi
-
-  # Fix scsi0 line if it has a drive_format property
-  if grep -q "scsi0.*drive_format" "$VM_CONFIG"; then
-    sed -i 's/,drive_format=qcow2//g' "$VM_CONFIG"
-  fi
-
-  # Add kernel boot parameters to directly boot the disk
-  if ! grep -q "^bootdisk:" "$VM_CONFIG"; then
-    echo "bootdisk: scsi0" >> "$VM_CONFIG"
-  fi
-
-  # Add args to suppress PIIX warnings
-  echo "args: -global PIIX4_PM.disable_s3=0 -global PIIX4_PM.disable_s4=0" >> "$VM_CONFIG"
-
-  msg_ok "VM configuration adjusted for ARM emulation"
-fi
+msg_ok "Created VenusOS VM"
 
 if [ "$START_VM" == "yes" ]; then
   msg_info "Starting VenusOS VM"
-
-  # Final check - make sure there are no drive_format entries in any config lines
-  if [ -f "$VM_CONFIG" ]; then
-    if grep -q "drive_format" "$VM_CONFIG"; then
-      msg_info "Removing problematic drive_format parameters"
-      sed -i 's/,drive_format=[^,]*//g' "$VM_CONFIG"
-      msg_ok "Fixed configuration"
-    fi
-  fi
-
   qm start $VMID
   msg_ok "Started VenusOS VM"
 fi
+
 post_update_to_api "done" "none"
 msg_ok "Completed Successfully!\n"
-echo -e "\n${BL}Note: Venus OS is now running in ARM emulation mode."
+echo -e "\n${BL}Note: Venus OS is running in ARM emulation mode."
 echo -e "The default login for VenusOS is username: 'root' with no password."
 echo -e "VM console is available via serial console in Proxmox web interface.${CL}\n"
 
-# Add option to run diagnostics if needed
-if [ "$1" == "--diagnose" ]; then
-  echo -e "${YW}Running diagnostic checks...${CL}"
-  diagnostic_info
+# Save the files to the persistent directory
+if [ -f "$FILE" ]; then
+  msg_info "Saving compressed image to $IMAGE_DIR"
+  cp "$FILE" "$IMAGE_DIR/"
+  msg_ok "Saved extracted image to $IMAGE_DIR/$FILE"
 fi
 
-function diagnostic_info() {
-  # Display qemu-system-aarch64 version
-  echo -e "${BL}QEMU version:${CL}"
-  qemu-system-aarch64 --version
+if [ -f "$EXTRACTED_FILE" ]; then
+  msg_info "Saving extracted image to $IMAGE_DIR"
+  cp "$EXTRACTED_FILE" "$IMAGE_DIR/"
+  msg_ok "Saved extracted image to $IMAGE_DIR/$EXTRACTED_FILE"
+fi
 
-  # Check for ARM firmware
-  echo -e "${BL}ARM firmware files:${CL}"
-  ls -la /usr/share/pve-edk2-firmware/ | grep -i arm
-
-  # Display Proxmox architecture
-  echo -e "${BL}System architecture:${CL}"
-  uname -a
-  dpkg --print-architecture
-
-  # Display Proxmox version
-  echo -e "${BL}Proxmox version:${CL}"
-  pveversion -v
-}
+if [ -f "$QCOW2_FILE" ]; then
+  msg_info "Saving qcow2 image to $IMAGE_DIR"
+  cp "$QCOW2_FILE" "$IMAGE_DIR/"
+  msg_ok "Saved qcow2 image to $IMAGE_DIR/$QCOW2_FILE"
+fi
