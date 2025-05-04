@@ -412,7 +412,7 @@ DISK0_REF=${STORAGE}:${DISK_REF:-}${DISK0}
 EFI_DISK=vm-${VMID}-disk-1${DISK_EXT:-}
 EFI_DISK_REF=${STORAGE}:${DISK_REF:-}${EFI_DISK}
 
-msg_info "Creating VenusOS VM"
+msg_info "Creating VenusOS VM with ARM emulation"
 qm create $VMID -bios ovmf -cores $CORE_COUNT -memory $RAM_SIZE -name $HN \
   -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
 
@@ -425,10 +425,7 @@ qm importdisk $VMID "$QCOW2_FILE" $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 # Add the disk to the VM
 qm set $VMID -scsi0 ${DISK0_REF},size=$DISK_SIZE >/dev/null
 
-# DO NOT create EFI disk with standard commands - it causes size mismatch issues
-# Instead, we'll manually configure it in the VM config file
-
-# Set boot order
+# Set boot order and description
 qm set $VMID \
   -boot order=scsi0 \
   -description "<div align='center'>
@@ -449,7 +446,7 @@ qm set $VMID -vga serial0 >/dev/null
 
 msg_ok "Created VenusOS VM ${CL}${BL}(${HN})"
 
-# Manually edit config file for proper EFI setup
+# Manually edit config file for proper ARM emulation
 VM_CONFIG="/etc/pve/qemu-server/${VMID}.conf"
 if [ -f "$VM_CONFIG" ]; then
   msg_info "Configuring VM for ARM emulation"
@@ -464,22 +461,32 @@ if [ -f "$VM_CONFIG" ]; then
     sed -i '/^cpu:/d' "$VM_CONFIG"
   fi
 
+  # Add proper pflash configuration for ARM-compatible UEFI
+  # This is the key fix - using pflash instead of efidisk for ARM emulation
+  if ! grep -q "^args:" "$VM_CONFIG"; then
+    echo "args: -drive if=pflash,unit=0,format=raw,readonly=on,file=/usr/share/pve-edk2-firmware//AAVMF_CODE.fd -drive if=pflash,unit=1,format=raw,file=/var/lib/vz/template/iso/venus/AAVMF_VARS-${VMID}.fd" >> "$VM_CONFIG"
+  fi
+
   # Ensure arch line exists
   if ! grep -q "^arch:" "$VM_CONFIG"; then
     echo "arch: aarch64" >> "$VM_CONFIG"
   fi
 
-  # Add proper EFI firmware configuration
-  if ! grep -q "^efidisk0:" "$VM_CONFIG"; then
-    # Create a small raw EFI file first
-    EFI_RAW_FILE="/var/lib/vz/template/iso/venus/efi_${VMID}.raw"
-    dd if=/dev/zero of="$EFI_RAW_FILE" bs=1M count=4 >/dev/null 2>&1
+  msg_ok "VM configuration adjusted for ARM emulation"
 
-    # Add it to config with proper size
-    echo "efidisk0: file=$EFI_RAW_FILE,format=raw,size=4M,pre-enrolled-keys=0" >> "$VM_CONFIG"
+  # Create AAVMF_VARS file if it doesn't exist
+  mkdir -p /var/lib/vz/template/iso/venus
+  if [ ! -f "/var/lib/vz/template/iso/venus/AAVMF_VARS-${VMID}.fd" ]; then
+    msg_info "Creating UEFI variables file for ARM"
+    # Create an empty 64MB file for UEFI variables
+    dd if=/dev/zero of="/var/lib/vz/template/iso/venus/AAVMF_VARS-${VMID}.fd" bs=1M count=64 >/dev/null 2>&1
+    msg_ok "Created UEFI variables file"
   fi
 
-  msg_ok "VM configuration adjusted for ARM emulation"
+  # Remove any efidisk0 entry if it exists - we're using pflash instead
+  if grep -q "^efidisk0:" "$VM_CONFIG"; then
+    sed -i '/^efidisk0:/d' "$VM_CONFIG"
+  fi
 fi
 
 if [ "$START_VM" == "yes" ]; then
