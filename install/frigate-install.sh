@@ -51,10 +51,20 @@ msg_ok "Set Up Hardware Acceleration"
 #RELEASE=$(curl -fsSL https://api.github.com/repos/blakeblackshear/frigate/releases/latest | jq -r '.tag_name')
 msg_ok "Stop spinner to prevent segmentation fault"
 msg_info "Installing Frigate v0.14.1 (Perseverance)"
-if [ -n "$SPINNER_PID" ] && ps -p $SPINNER_PID >/dev/null; then kill $SPINNER_PID >/dev/null; fi
+# Make sure SPINNER_PID is initialized
+SPINNER_PID=${SPINNER_PID:-""}
+if [ -n "$SPINNER_PID" ] && ps -p $SPINNER_PID >/dev/null 2>&1; then
+  kill $SPINNER_PID >/dev/null 2>&1
+fi
 cd ~
 mkdir -p /opt/frigate/models
-curl -fsSL "https://github.com/blakeblackshear/frigate/archive/refs/tags/v0.14.1.tar.gz" -o "frigate.tar.gz"
+# Use a more reliable download method with appropriate retries
+for i in {1..3}; do
+  if curl -L --retry 5 --retry-delay 10 --retry-max-time 60 "https://github.com/blakeblackshear/frigate/archive/v0.14.1.tar.gz" -o "frigate.tar.gz"; then
+    break
+  fi
+  sleep 5
+done
 tar -xzf frigate.tar.gz -C /opt/frigate --strip-components 1
 rm -rf frigate.tar.gz
 cd /opt/frigate
