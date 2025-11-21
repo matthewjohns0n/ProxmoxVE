@@ -1168,9 +1168,17 @@ build_container() {
   echo -e "${YW}==============================================${CL}\n"
 
   # This executes create_lxc.sh and creates the container and .conf file
+  # Temporarily disable error handling to capture output
+  set +e
+  trap - ERR
+
   # Capture output for debugging
-  CREATE_LXC_OUTPUT=$(bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/create_lxc.sh)" 2>&1)
+  CREATE_LXC_OUTPUT=$(bash -c "$(curl -fsSL https://raw.githubusercontent.com/matthewjohns0n/ProxmoxVE/main/misc/create_lxc.sh)" 2>&1)
   CREATE_LXC_EXIT=$?
+
+  # Re-enable error handling
+  set -e
+  trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
 
   # Display the output
   echo -e "\n${YW}=== DEBUG: create_lxc.sh Output ===${CL}"
