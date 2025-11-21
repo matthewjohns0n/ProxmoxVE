@@ -27,15 +27,8 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  if [[ "$(node -v | cut -d 'v' -f 2)" == "18."* ]]; then
-    if ! command -v npm >/dev/null 2>&1; then
-      echo "Installing NPM..."
-      $STD apt-get install -y npm
-      $STD npm install -g pnpm
-      echo "Installed NPM..."
-    fi
-  fi
-  # ensure that jq is installed
+
+  NODE_VERSION="22" NODE_MODULE="pnpm@latest" setup_nodejs
   if ! command -v jq &>/dev/null; then
     $STD msg_info "Installing jq..."
     $STD apt-get update -qq &>/dev/null
@@ -56,7 +49,7 @@ function update_script() {
     rm -rf homepage-${RELEASE}
     cd /opt/homepage
     $STD pnpm install
-    $STD npx --yes update-browserslist-db@latest
+    $STD pnpm update --no-save caniuse-lite
     export NEXT_PUBLIC_VERSION="v$RELEASE"
     export NEXT_PUBLIC_REVISION="source"
     export NEXT_PUBLIC_BUILDTIME=$(curl -fsSL https://api.github.com/repos/gethomepage/homepage/releases/latest | jq -r '.published_at')
@@ -67,7 +60,7 @@ function update_script() {
     fi
     systemctl start homepage
     echo "${RELEASE}" >/opt/${APP}_version.txt
-    msg_ok "Updated Homepage to v${RELEASE}"
+    msg_ok "Updated successfully!"
   else
     msg_ok "No update required. ${APP} is already at v${RELEASE}"
   fi

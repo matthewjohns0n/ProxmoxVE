@@ -14,32 +14,17 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y gpg
-msg_ok "Installed Dependencies"
-
-msg_info "Installing Node.js"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-$STD apt-get update
-$STD apt-get install -y nodejs
-msg_ok "Installed Node.js"
-
 msg_info "Installing NUT"
-$STD apt-get install -y nut-client
+$STD apt install -y nut-client
 msg_ok "Installed NUT"
 
-msg_info "Installing Peanut"
-RELEASE=$(curl -fsSL https://api.github.com/repos/Brandawg93/PeaNUT/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
-curl -fsSL "https://api.github.com/repos/Brandawg93/PeaNUT/tarball/${RELEASE}" -o "peanut.tar.gz"
-mkdir -p /opt/peanut
-tar -xzf peanut.tar.gz -C /opt/peanut --strip-components=1
-rm peanut.tar.gz
+NODE_VERSION="22" NODE_MODULE="pnpm" setup_nodejs
+fetch_and_deploy_gh_release "peanut" "Brandawg93/PeaNUT" "tarball" "latest" "/opt/peanut"
+
+msg_info "Setup Peanut"
 cd /opt/peanut
-$STD npm install -g pnpm
 $STD pnpm i
-$STD pnpm run build
+$STD pnpm run build:local
 cp -r .next/static .next/standalone/.next/
 mkdir -p /opt/peanut/.next/standalone/config
 mkdir -p /etc/peanut/
@@ -50,7 +35,7 @@ NUT_HOST: 0.0.0.0
 NUT_PORT: 3493
 EOF
 ln -sf /etc/peanut/settings.yml /opt/peanut/.next/standalone/config/settings.yml
-msg_ok "Installed Peanut"
+msg_ok "Setup Peanut"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/peanut.service
@@ -80,6 +65,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

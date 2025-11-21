@@ -13,16 +13,12 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Prometheus Alertmanager"
-RELEASE=$(curl -fsSL https://api.github.com/repos/prometheus/alertmanager/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-mkdir -p /etc/alertmanager
-mkdir -p /var/lib/alertmanager
-curl -fsSL "https://github.com/prometheus/alertmanager/releases/download/v${RELEASE}/alertmanager-${RELEASE}.linux-amd64.tar.gz" -o $(basename "https://github.com/prometheus/alertmanager/releases/download/v${RELEASE}/alertmanager-${RELEASE}.linux-amd64.tar.gz")
-tar -xf alertmanager-${RELEASE}.linux-amd64.tar.gz
-mv alertmanager-${RELEASE}.linux-amd64/alertmanager alertmanager-${RELEASE}.linux-amd64/amtool /usr/local/bin/
-mv alertmanager-${RELEASE}.linux-amd64/alertmanager.yml /etc/alertmanager/alertmanager.yml
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
-msg_ok "Installed Prometheus Alertmanager"
+fetch_and_deploy_gh_release "alertmanager" "prometheus/alertmanager" "prebuild" "latest" "/usr/local/bin/" "alertmanager*linux-amd64.tar.gz"
+
+msg_info "Configuring Prometheus Alertmanager"
+mkdir -p /etc/alertmanager /var/lib/alertmanager
+mv /usr/local/bin/alertmanager.yml /etc/alertmanager/alertmanager.yml
+msg_ok "Configured Prometheus Alertmanager"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/prometheus-alertmanager.service
@@ -51,7 +47,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
-rm -rf alertmanager-${RELEASE}.linux-amd64 alertmanager-${RELEASE}.linux-amd64.tar.gz
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

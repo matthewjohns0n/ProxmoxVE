@@ -13,19 +13,47 @@ setting_up_container
 network_check
 update_os
 
-RELEASE=$(curl -fsSL https://api.github.com/repos/juanfont/headscale/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-msg_info "Installing ${APPLICATION} v${RELEASE}"
-curl -fsSL "https://github.com/juanfont/headscale/releases/download/v${RELEASE}/headscale_${RELEASE}_linux_amd64.deb" -o $(basename "https://github.com/juanfont/headscale/releases/download/v${RELEASE}/headscale_${RELEASE}_linux_amd64.deb")
-$STD dpkg -i headscale_${RELEASE}_linux_amd64.deb
+fetch_and_deploy_gh_release "headscale" "juanfont/headscale" "binary"
+
+read -r -p "${TAB3}Would you like to add headscale-admin UI? <y/N> " prompt
+if [[ ${prompt,,} =~ ^(y|yes)$ ]]; then
+  fetch_and_deploy_gh_release "headscale-admin" "GoodiesHQ/headscale-admin" "prebuild" "latest" "/opt/headscale-admin" "admin.zip"
+
+  msg_info "Configuring headscale-admin"
+  $STD apt install -y caddy
+  $STD caddy stop
+  rm /etc/caddy/Caddyfile
+  cat <<'EOF' >/etc/caddy/Caddyfile
+:80
+
+redir /admin /admin/
+
+handle_path /admin* {
+    root * /opt/headscale-admin
+    encode gzip zstd
+
+    header {
+        X-Content-Type-Options nosniff
+    }
+
+    try_files {path} {path}/ /opt/headscale-admin/index.html
+    file_server
+}
+
+handle /api/* {
+    reverse_proxy localhost:8080
+}
+
+EOF
+  caddy fmt --overwrite /etc/caddy/Caddyfile
+  systemctl start caddy
+  msg_ok "Configured headscale-admin"
+fi
+
+msg_info "Starting service"
 systemctl enable -q --now headscale
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
-msg_ok "Installed ${APPLICATION} v${RELEASE}"
+msg_ok "Service started"
 
 motd_ssh
 customize
-
-msg_info "Cleaning up"
-rm headscale_${RELEASE}_linux_amd64.deb
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
-msg_ok "Cleaned"
+cleanup_lxc

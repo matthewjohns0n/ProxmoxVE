@@ -15,25 +15,24 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y apt-transport-https
-$STD apt-get install -y gpg
-$STD apt-get install -y xvfb
+$STD apt-get install -y \
+  apt-transport-https \
+  xvfb
 msg_ok "Installed Dependencies"
 
 msg_info "Installing Chrome"
-curl -fsSL "https://dl.google.com/linux/linux_signing_key.pub" | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" >/etc/apt/sources.list.d/google-chrome.list
+setup_deb822_repo \
+  "google-chrome" \
+  "https://dl.google.com/linux/linux_signing_key.pub" \
+  "https://dl.google.com/linux/chrome/deb/" \
+  "stable"
 $STD apt update
 $STD apt install -y google-chrome-stable
+# remove google-chrome.list added by google-chrome-stable
+rm /etc/apt/sources.list.d/google-chrome.list
 msg_ok "Installed Chrome"
 
-msg_info "Installing FlareSolverr"
-RELEASE=$(curl -fsSL https://github.com/FlareSolverr/FlareSolverr/releases/latest | grep "title>Release" | cut -d " " -f 4)
-$STD curl -fsSL "https://github.com/FlareSolverr/FlareSolverr/releases/download/$RELEASE/flaresolverr_linux_x64.tar.gz" -o "flaresolverr_linux_x64.tar.gz"
-$STD tar -xzf flaresolverr_linux_x64.tar.gz -C /opt
-$STD rm flaresolverr_linux_x64.tar.gz
-echo "${RELEASE}" >/opt/"${APPLICATION}"_version.txt
-msg_ok "Installed FlareSolverr"
+fetch_and_deploy_gh_release "flaresolverr" "FlareSolverr/FlareSolverr" "prebuild" "latest" "/opt/flaresolverr" "flaresolverr_linux_x64.tar.gz"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/flaresolverr.service

@@ -14,29 +14,18 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
+$STD apt install -y \
   git \
-  gnupg \
   apache2 \
   libapache2-mod-wsgi-py3
 msg_ok "Installed Dependencies"
 
 msg_info "Installing Python"
-$STD apt-get install -y python3-pip
+$STD apt install -y python3-pip
 rm -rf /usr/lib/python3.*/EXTERNALLY-MANAGED
 msg_ok "Installed Python"
 
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
-
-msg_info "Installing Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-$STD npm install -g yarn sass
-msg_ok "Installed Node.js"
+NODE_VERSION="22" NODE_MODULE="yarn,sass" setup_nodejs
 
 msg_info "Setting up wger"
 $STD adduser wger --disabled-password --gecos ""
@@ -47,13 +36,13 @@ chmod g+w /home/wger/db /home/wger/db/database.sqlite
 mkdir /home/wger/{static,media}
 chmod o+w /home/wger/media
 temp_dir=$(mktemp -d)
-cd $temp_dir
+cd "$temp_dir" || exit
 RELEASE=$(curl -fsSL https://api.github.com/repos/wger-project/wger/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3)}')
-curl -fsSL "https://github.com/wger-project/wger/archive/refs/tags/$RELEASE.tar.gz" -o $(basename "https://github.com/wger-project/wger/archive/refs/tags/$RELEASE.tar.gz")
-tar xzf $RELEASE.tar.gz
-mv wger-$RELEASE /home/wger/src
-cd /home/wger/src
-$STD pip install -r requirements_prod.txt
+curl -fsSL "https://github.com/wger-project/wger/archive/refs/tags/$RELEASE.tar.gz" -o "$RELEASE.tar.gz"
+tar xzf "$RELEASE".tar.gz
+mv wger-"$RELEASE" /home/wger/src
+cd /home/wger/src || exit
+$STD pip install -r requirements_prod.txt --ignore-installed
 $STD pip install -e .
 $STD wger create-settings --database-path /home/wger/db/database.sqlite
 sed -i "s#home/wger/src/media#home/wger/media#g" /home/wger/src/settings.py
@@ -116,9 +105,10 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -rf $temp_dir
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+rm -rf "$temp_dir"
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"
 
 motd_ssh

@@ -19,17 +19,16 @@ $STD apt-get install -y \
     build-essential
 msg_ok "Installed Dependencies"
 
-
-
 git clone -q https://github.com/Fallenbagel/jellyseerr.git /opt/jellyseerr
 cd /opt/jellyseerr
 $STD git checkout main
 
 pnpm_desired=$(grep -Po '"pnpm":\s*"\K[^"]+' /opt/jellyseerr/package.json)
-NODE_VERSION="22" NODE_MODULE="pnpm@$pnpm_desired" install_node_and_modules
+NODE_VERSION="22" NODE_MODULE="pnpm@$pnpm_desired" setup_nodejs
 
 msg_info "Installing Jellyseerr (Patience)"
 export CYPRESS_INSTALL_BINARY=0
+cd /opt/jellyseerr
 $STD pnpm install --frozen-lockfile
 export NODE_OPTIONS="--max-old-space-size=3072"
 $STD pnpm build

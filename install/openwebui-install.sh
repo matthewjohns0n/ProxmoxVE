@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 # Copyright (c) 2021-2025 tteck
-# Author: tteck
-# Co-Author: havardthom
+# Author: tteck | Co-Author: havardthom | Co-Author: Slaviša Arežina (tremor021)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://openwebui.com/
 
@@ -15,50 +14,19 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
-  gpg \
-  git \
-  ffmpeg
+$STD apt install -y ffmpeg
 msg_ok "Installed Dependencies"
 
-msg_info "Setup Python3"
-$STD apt-get install -y --no-install-recommends \
-  python3 \
-  python3-pip
-msg_ok "Setup Python3"
+PYTHON_VERSION="3.12" setup_uv
 
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
-
-msg_info "Installing Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-msg_ok "Installed Node.js"
-
-msg_info "Installing Open WebUI (Patience)"
-$STD git clone https://github.com/open-webui/open-webui.git /opt/open-webui
-cd /opt/open-webui/backend
-$STD pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-$STD pip3 install -r requirements.txt -U
-cd /opt/open-webui
-cp .env.example .env
-cat <<EOF >/opt/open-webui/.env
-ENV=prod
-ENABLE_OLLAMA_API=false
-OLLAMA_BASE_URL=http://0.0.0.0:11434
-EOF
-$STD npm install
-export NODE_OPTIONS="--max-old-space-size=3584"
-$STD npm run build
+msg_info "Installing Open WebUI"
+$STD uv tool install --python 3.12 open-webui[all]
 msg_ok "Installed Open WebUI"
 
-read -r -p "Would you like to add Ollama? <y/N> " prompt
+read -r -p "${TAB3}Would you like to add Ollama? <y/N> " prompt
 if [[ ${prompt,,} =~ ^(y|yes)$ ]]; then
   msg_info "Installing Ollama"
-  curl -fsSLO https://ollama.com/download/ollama-linux-amd64.tgz
+  curl -fsSLO -C - https://ollama.com/download/ollama-linux-amd64.tgz
   tar -C /usr -xzf ollama-linux-amd64.tgz
   rm -rf ollama-linux-amd64.tgz
   cat <<EOF >/etc/systemd/system/ollama.service
@@ -78,7 +46,7 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
   systemctl enable -q --now ollama
-  sed -i 's/ENABLE_OLLAMA_API=false/ENABLE_OLLAMA_API=true/g' /opt/open-webui/.env
+  echo "ENABLE_OLLAMA_API=true" >/root/.env
   msg_ok "Installed Ollama"
 fi
 
@@ -89,10 +57,14 @@ Description=Open WebUI Service
 After=network.target
 
 [Service]
-Type=exec
-WorkingDirectory=/opt/open-webui
-EnvironmentFile=/opt/open-webui/.env
-ExecStart=/opt/open-webui/backend/start.sh
+Type=simple
+EnvironmentFile=-/root/.env
+Environment=DATA_DIR=/root/.open-webui
+ExecStart=/root/.local/bin/open-webui serve
+WorkingDirectory=/root
+Restart=on-failure
+RestartSec=5
+User=root
 
 [Install]
 WantedBy=multi-user.target
@@ -102,8 +74,4 @@ msg_ok "Created Service"
 
 motd_ssh
 customize
-
-msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
-msg_ok "Cleaned"
+cleanup_lxc

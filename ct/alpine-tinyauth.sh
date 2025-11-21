@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 source <(curl -s https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2025 community-scripts ORG
-# Author: Slaviša Arežina (tremor021)
+# Author: Slaviša Arežina (tremor021) | Co-Author: Stavros (steveiliop56)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://github.com/steveiliop56/tinyauth
 
-APP="Alpine-tinyauth"
+APP="Alpine-Tinyauth"
 var_tags="${var_tags:-alpine;auth}"
 var_cpu="${var_cpu:-1}"
-var_ram="${var_ram:-512}"
-var_disk="${var_disk:-3}"
+var_ram="${var_ram:-256}"
+var_disk="${var_disk:-2}"
 var_os="${var_os:-alpine}"
-var_version="${var_version:-3.21}"
+var_version="${var_version:-3.22}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -22,37 +22,30 @@ catch_errors
 function update_script() {
   if [[ ! -d /opt/tinyauth ]]; then
     msg_error "No ${APP} Installation Found!"
-    exit 1
+    exit
   fi
 
-  msg_info "Updating Alpine Packages"
+  msg_info "Updating packages"
   $STD apk -U upgrade
-  msg_ok "Updated Alpine Packages"
+  msg_ok "Updated packages"
 
-  msg_info "Updating tinyauth"
   RELEASE=$(curl -s https://api.github.com/repos/steveiliop56/tinyauth/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-  if [ "${RELEASE}" != "$(cat /opt/tinyauth_version.txt)" ] || [ ! -f /opt/tinyauth_version.txt ]; then
+  if [ "${RELEASE}" != "$(cat ~/.tinyauth 2>/dev/null)" ] || [ ! -f ~/.tinyauth ]; then
+    msg_info "Stopping Service"
     $STD service tinyauth stop
-    temp_file=$(mktemp)
-    cp /opt/tinyauth/.env /opt
-    rm -rf /opt/tinyauth
-    mkdir -p /opt/tinyauth
-    curl -fsSL "https://github.com/steveiliop56/tinyauth/archive/refs/tags/v${RELEASE}.tar.gz" -o "$temp_file"
-    tar -xzf "$temp_file" -C /opt/tinyauth --strip-components=1
-    cd /opt/tinyauth/frontend
-    $STD bun install
-    $STD bun run build
-    mv dist /opt/tinyauth/internal/assets/
-    cd /opt/tinyauth
-    $STD go mod download
-    CGO_ENABLED=0 go build -ldflags "-s -w"
-    cp /opt/.env /opt/tinyauth
-    echo "${RELEASE}" >/opt/tinyauth_version.txt
-    rm -f "$temp_file"
-    msg_info "Restarting tinyauth"
+    msg_ok "Service Stopped"
+
+    msg_info "Updating Tinyauth"
+    rm -f /opt/tinyauth/tinyauth
+    curl -fsSL "https://github.com/steveiliop56/tinyauth/releases/download/v${RELEASE}/tinyauth-amd64" -o /opt/tinyauth/tinyauth
+    chmod +x /opt/tinyauth/tinyauth
+    echo "${RELEASE}" >~/.tinyauth
+    msg_ok "Updated Tinyauth"
+
+    msg_info "Restarting Tinyauth"
     $STD service tinyauth start
-    msg_ok "Restarted tinyauth"
-    msg_ok "Updated tinyauth"
+    msg_ok "Restarted Tinyauth"
+    msg_ok "Updated successfully!"
   else
     msg_ok "No update required. ${APP} is already at ${RELEASE}"
   fi

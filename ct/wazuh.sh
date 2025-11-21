@@ -9,7 +9,7 @@ APP="Wazuh"
 var_tags="${var_tags:-security;monitoring}"
 var_cpu="${var_cpu:-4}"
 var_ram="${var_ram:-4096}"
-var_disk="${var_disk:-18}"
+var_disk="${var_disk:-25}"
 var_os="${var_os:-debian}"
 var_version="${var_version:-12}"
 var_unprivileged="${var_unprivileged:-1}"
@@ -20,18 +20,19 @@ color
 catch_errors
 
 function update_script() {
-   header_info
-   check_container_storage
-   check_container_resources
-   if [[ ! -f /lib/systemd/system/wazuh-manager.service ]]; then
-      msg_error "No ${APP} Installation Found!"
-      exit
-   fi
-   msg_info "Updating ${APP} LXC"
-   $STD apt-get update
-   $STD apt-get -y upgrade
-   msg_ok "Updated ${APP} LXC"
-   exit
+  header_info
+  check_container_storage
+  check_container_resources
+  if [[ ! -f /lib/systemd/system/wazuh-manager.service ]]; then
+    msg_error "No ${APP} Installation Found!"
+    exit
+  fi
+  msg_info "Updating ${APP} LXC"
+  $STD apt-get update
+  $STD apt-get -y upgrade
+  msg_ok "Updated ${APP} LXC"
+  msg_ok "Updated successfully!"
+  exit
 }
 
 start

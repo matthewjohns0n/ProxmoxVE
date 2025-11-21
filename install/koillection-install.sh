@@ -13,27 +13,10 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y \
-  gnupg2 postgresql \
-  apache2 \
-  lsb-release
-msg_ok "Installed Dependencies"
-
-msg_info "Setup PHP8.4 Repository"
-$STD curl -fsSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
-$STD dpkg -i /tmp/debsuryorg-archive-keyring.deb
-$STD sh -c 'echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list'
-$STD apt-get update
-msg_ok "Setup PHP8.4 Repository"
-
-msg_info "Setup PHP"
-$STD apt-get install -y \
-  php8.4 \
-  php8.4-{apcu,ctype,curl,dom,fileinfo,gd,iconv,intl,mbstring,pgsql} \
-  libapache2-mod-php8.4 \
-  composer
-msg_info "Setup PHP"
+NODE_VERSION="22" NODE_MODULE="yarn@latest" setup_nodejs
+PG_VERSION="16" setup_postgresql
+PHP_VERSION="8.4" PHP_APACHE="YES" PHP_MODULE="apcu,ctype,dom,fileinfo,iconv,pgsql" setup_php
+setup_composer
 
 msg_info "Setting up PostgreSQL"
 DB_NAME=koillection
@@ -49,22 +32,9 @@ $STD sudo -u postgres psql -c "CREATE DATABASE $DB_NAME WITH OWNER $DB_USER TEMP
 } >>~/koillection.creds
 msg_ok "Set up PostgreSQL"
 
-msg_info "Setting up Node.js/Yarn"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-$STD apt-get update
-$STD apt-get install -y nodejs
-$STD npm install -g npm@latest
-$STD npm install -g yarn
-msg_ok "Installed Node.js/Yarn"
+fetch_and_deploy_gh_release "koillection" "benjaminjonard/koillection"
 
-msg_info "Installing Koillection"
-RELEASE=$(curl -fsSL https://api.github.com/repos/benjaminjonard/koillection/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-cd /opt
-curl -fsSL "https://github.com/benjaminjonard/koillection/archive/refs/tags/${RELEASE}.zip" -o $(basename "https://github.com/benjaminjonard/koillection/archive/refs/tags/${RELEASE}.zip")
-unzip -q "${RELEASE}.zip"
-mv "/opt/koillection-${RELEASE}" /opt/koillection
+msg_info "Configuring Koillection"
 cd /opt/koillection
 cp /opt/koillection/.env /opt/koillection/.env.local
 APP_SECRET=$(openssl rand -base64 32)
@@ -83,8 +53,7 @@ cd assets/
 $STD yarn install
 $STD yarn build
 chown -R www-data:www-data /opt/koillection/public/uploads
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
-msg_ok "Installed Koillection"
+msg_ok "Configured Koillection"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/apache2/sites-available/koillection.conf
@@ -113,9 +82,4 @@ msg_ok "Created Service"
 
 motd_ssh
 customize
-
-msg_info "Cleaning up"
-rm -rf "/opt/${RELEASE}.zip"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
-msg_ok "Cleaned"
+cleanup_lxc

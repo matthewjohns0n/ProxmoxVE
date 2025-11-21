@@ -14,27 +14,12 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
+$STD apt install -y \
   apt-transport-https \
-  ca-certificates \
-  gpg
+  ca-certificates
 msg_ok "Installed Dependencies"
 
-msg_info "Setting up OpenProject Repository"
-curl -fsSL "https://dl.packager.io/srv/opf/openproject/key" | gpg --dearmor >/etc/apt/trusted.gpg.d/packager-io.gpg
-curl -fsSL  "https://dl.packager.io/srv/opf/openproject/stable/15/installer/debian/12.repo" -o "/etc/apt/sources.list.d/openproject.list"
-msg_ok "Setup OpenProject Repository"
-
-msg_info "Setting up PostgreSQL Repository"
-VERSION="$(awk -F'=' '/^VERSION_CODENAME=/{ print $NF }' /etc/os-release)"
-echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION}-pgdg main" >/etc/apt/sources.list.d/pgdg.list
-curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor --output /etc/apt/trusted.gpg.d/postgresql.gpg
-msg_ok "Setup PostgreSQL Repository"
-
-msg_info "Installing PostgreSQL"
-$STD apt-get update
-$STD apt-get install -y postgresql
-msg_ok "Installed PostgreSQL"
+PG_VERSION="17" setup_postgresql
 
 msg_info "Setting up PostgreSQL"
 DB_NAME=openproject
@@ -52,8 +37,14 @@ $STD sudo -u postgres psql -c "CREATE DATABASE $DB_NAME WITH OWNER $DB_USER TEMP
 } >>~/openproject.creds
 msg_ok "Set up PostgreSQL"
 
+msg_info "Setting up OpenProject Repository"
+curl -fsSL "https://dl.packager.io/srv/opf/openproject/key" | gpg --dearmor >/etc/apt/trusted.gpg.d/packager-io.gpg
+curl -fsSL "https://dl.packager.io/srv/opf/openproject/stable/15/installer/debian/12.repo" -o "/etc/apt/sources.list.d/openproject.list"
+$STD apt update
+msg_ok "Setup OpenProject Repository"
+
 msg_info "Installing OpenProject"
-$STD apt-get install -y openproject
+$STD apt install -y openproject
 msg_ok "Installed OpenProject"
 
 msg_info "Configuring OpenProject"
@@ -75,7 +66,6 @@ server/hostname ${IP_ADDR}
 server/server_path_prefix /openproject
 server/ssl no
 server/variant apache2
-server/server_path_prefix
 repositories/api-key ${API_KEY}
 repositories/svn-install skip
 repositories/git-install install
@@ -93,6 +83,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

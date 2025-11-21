@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-2}"
 var_ram="${var_ram:-2048}"
 var_disk="${var_disk:-8}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -27,35 +27,23 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  if [[ ! -f /opt/${APP}_version.txt ]]; then
-    touch /opt/${APP}_version.txt
-    mkdir -p $HOME/.config/qBittorrent/
-    mkdir -p /opt/qbittorrent/
-    mv /.config/qBittorrent $HOME/.config/
-    $STD apt-get remove --purge -y qbittorrent-nox
-    sed -i 's@ExecStart=/usr/bin/qbittorrent-nox@ExecStart=/opt/qbittorrent/qbittorrent-nox@g' /etc/systemd/system/qbittorrent-nox.service
-    systemctl daemon-reload
+  if [[ ! -f ~/.qbittorrent ]]; then
+    msg_error "Please create new qBittorrent LXC. Updating from v4.x to v5.x is not supported!"
+    exit
   fi
-  FULLRELEASE=$(curl -fsSL https://api.github.com/repos/userdocs/qbittorrent-nox-static/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-  RELEASE=$(echo $FULLRELEASE | cut -c 9-13)
-  if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
+  if check_for_gh_release "qbittorrent" "userdocs/qbittorrent-nox-static"; then
     msg_info "Stopping Service"
     systemctl stop qbittorrent-nox
     msg_ok "Stopped Service"
 
-    msg_info "Updating ${APP} to v${RELEASE}"
     rm -f /opt/qbittorrent/qbittorrent-nox
-    curl -fsSL "https://github.com/userdocs/qbittorrent-nox-static/releases/download/${FULLRELEASE}/x86_64-qbittorrent-nox" -o /opt/qbittorrent/qbittorrent-nox
-    chmod +x /opt/qbittorrent/qbittorrent-nox
-    echo "${RELEASE}" >/opt/${APP}_version.txt
-    msg_ok "Updated $APP to v${RELEASE}"
+    fetch_and_deploy_gh_release "qbittorrent" "userdocs/qbittorrent-nox-static" "singlefile" "latest" "/opt/qbittorrent" "x86_64-qbittorrent-nox"
+    mv /opt/qbittorrent/qbittorrent /opt/qbittorrent/qbittorrent-nox
 
     msg_info "Starting Service"
     systemctl start qbittorrent-nox
     msg_ok "Started Service"
-    msg_ok "Updated Successfully"
-  else
-    msg_ok "No update required. ${APP} is already at v${RELEASE}"
+    msg_ok "Updated successfully!"
   fi
   exit
 }

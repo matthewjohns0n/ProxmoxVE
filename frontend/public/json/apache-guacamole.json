@@ -2,16 +2,16 @@
   "name": "Apache Guacamole",
   "slug": "apache-guacamole",
   "categories": [
-        0
+    0
   ],
   "date_created": "2024-12-19",
   "type": "ct",
   "updateable": false,
   "privileged": false,
   "interface_port": 8080,
-  "documentation": null,
+  "documentation": "https://guacamole.apache.org/doc/gug/",
   "website": "https://guacamole.apache.org/",
-  "logo": "https://guacamole.apache.org/images/logos/guac-tricolor-logo.svg",
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/webp/apache-guacamole.webp",
   "config_path": "/etc/guacamole/guacd.conf",
   "description": "Apache Guacamole is a clientless remote desktop gateway. It supports standard protocols like VNC, RDP, and SSH.",
   "install_methods": [
@@ -23,7 +23,7 @@
         "ram": 2048,
         "hdd": 4,
         "os": "debian",
-        "version": "12"
+        "version": "13"
       }
     }
   ],
@@ -33,4 +33,3 @@
   },
   "notes": []
 }
-

@@ -26,11 +26,10 @@ $STD rc-update add docker boot
 $STD service docker start
 msg_ok "Enabled Docker Service"
 
-echo "Choose the database for Komodo installation:"
-echo "1) MongoDB (recommended)"
-echo "2) SQLite"
-echo "3) PostgreSQL"
-read -rp "Enter your choice (default: 1): " DB_CHOICE
+echo "${TAB3}Choose the database for Komodo installation:"
+echo "${TAB3}1) MongoDB (recommended)"
+echo "${TAB3}2) FerretDB"
+read -rp "${TAB3}Enter your choice (default: 1): " DB_CHOICE
 DB_CHOICE=${DB_CHOICE:-1}
 
 case $DB_CHOICE in
@@ -38,10 +37,7 @@ case $DB_CHOICE in
   DB_COMPOSE_FILE="mongo.compose.yaml"
   ;;
 2)
-  DB_COMPOSE_FILE="sqlite.compose.yaml"
-  ;;
-3)
-  DB_COMPOSE_FILE="postgres.compose.yaml"
+  DB_COMPOSE_FILE="ferretdb.compose.yaml"
   ;;
 *)
   echo "Invalid choice. Defaulting to MongoDB."

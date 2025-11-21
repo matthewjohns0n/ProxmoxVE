@@ -28,8 +28,8 @@ $STD apt-get install -y \
   python3-bcrypt
 msg_ok "Installed Dependencies"
 
-NODE_VERSION="22" NODE_MODULE="turbo@1.9.3" install_node_and_modules
-PG_VERSION="16" install_postgresql
+NODE_VERSION="22" NODE_MODULE="turbo@1.9.3" setup_nodejs
+PG_VERSION="16" setup_postgresql
 
 msg_info "Setting up PostgreSQL"
 DB_NAME="documenso_db"
@@ -52,7 +52,7 @@ msg_info "Installing Documenso (Patience)"
 cd /opt
 RELEASE=$(curl -fsSL https://api.github.com/repos/documenso/documenso/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
 curl -fsSL "https://github.com/documenso/documenso/archive/refs/tags/v${RELEASE}.zip" -o v${RELEASE}.zip
-unzip -q v${RELEASE}.zip
+$STD unzip v${RELEASE}.zip
 mv documenso-${RELEASE} /opt/documenso
 cd /opt/documenso
 mv .env.example /opt/documenso/.env
@@ -71,7 +71,11 @@ export TURBO_CACHE=1
 export NEXT_TELEMETRY_DISABLED=1
 export CYPRESS_INSTALL_BINARY=0
 export NODE_OPTIONS="--max-old-space-size=4096"
+$STD turbo prune --scope=@documenso/remix --docker
+cd out
+cp -r json/* .
 $STD npm ci
+cp -r full/* .
 $STD turbo run build --filter=@documenso/remix
 $STD npm run prisma:migrate-deploy
 echo "${RELEASE}" >"/opt/${APPLICATION}_version.txt"
@@ -79,7 +83,7 @@ msg_ok "Installed Documenso"
 
 msg_info "Create User"
 PASSWORD_HASH=$(python3 -c "import bcrypt; print(bcrypt.hashpw(b'helper-scripts', bcrypt.gensalt(rounds=12)).decode())")
-$STD sudo -u postgres psql -d documenso_db -c "INSERT INTO \"User\" (name, email, \"emailVerified\", password, \"identityProvider\", roles, \"createdAt\", \"lastSignedIn\", \"updatedAt\", \"customerId\") VALUES ('helper-scripts', 'helper-scripts@local.com', '2025-01-20 17:14:45.058', '$PASSWORD_HASH', 'DOCUMENSO', ARRAY['USER', 'ADMIN']::\"Role\"[], '2025-01-20 16:04:05.543', '2025-01-20 16:14:55.249', '2025-01-20 16:14:55.25', NULL) RETURNING id;"
+$STD sudo -u postgres psql -d documenso_db -c "INSERT INTO \"User\" (name, email, \"emailVerified\", password, \"identityProvider\", roles, \"createdAt\", \"lastSignedIn\", \"updatedAt\") VALUES ('helper-scripts', 'helper-scripts@local.com', '2025-01-20 17:14:45.058', '$PASSWORD_HASH', 'DOCUMENSO', ARRAY['USER', 'ADMIN']::\"Role\"[], '2025-01-20 16:04:05.543', '2025-01-20 16:14:55.249', '2025-01-20 16:14:55.25') RETURNING id;"
 $STD npm run prisma:migrate-deploy
 msg_ok "User created"
 

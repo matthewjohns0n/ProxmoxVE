@@ -13,33 +13,18 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y git
-$STD apt-get install -y ca-certificates
-$STD apt-get install -y gnupg
-msg_ok "Installed Dependencies"
-
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
-
-msg_info "Installing Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-msg_ok "Installed Node.js"
+NODE_VERSION="22" setup_nodejs
+fetch_and_deploy_gh_release "uptime-kuma" "louislam/uptime-kuma" "tarball"
 
 msg_info "Installing Uptime Kuma"
-$STD git clone https://github.com/louislam/uptime-kuma.git
-mv uptime-kuma /opt/uptime-kuma
 cd /opt/uptime-kuma
-$STD npm run setup
+$STD npm ci --omit dev
+$STD npm run download-dist
 msg_ok "Installed Uptime Kuma"
 
 msg_info "Creating Service"
-service_path="/etc/systemd/system/uptime-kuma.service"
-echo "[Unit]
+cat <<EOF >/etc/systemd/system/uptime-kuma.service
+[Unit]
 Description=uptime-kuma
 
 [Service]
@@ -50,14 +35,16 @@ WorkingDirectory=/opt/uptime-kuma
 ExecStart=/usr/bin/npm start
 
 [Install]
-WantedBy=multi-user.target" >$service_path
-$STD systemctl enable --now uptime-kuma
+WantedBy=multi-user.target
+EOF
+systemctl enable -q --now uptime-kuma
 msg_ok "Created Service"
 
 motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

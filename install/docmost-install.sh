@@ -14,24 +14,16 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
-  gpg \
+$STD apt install -y \
   redis \
-  make \
-  postgresql
+  jq \
+  make
 msg_ok "Installed Dependencies"
 
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
-
-msg_info "Installing Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-$STD npm install -g pnpm@10.4.0
-msg_ok "Installed Node.js"
+HOST_IP=$(hostname -I | awk '{print $1}')
+NODE_VERSION="22" NODE_MODULE="pnpm@$(curl -s https://raw.githubusercontent.com/docmost/docmost/main/package.json | jq -r '.packageManager | split("@")[1]')" setup_nodejs
+PG_VERSION="16" setup_postgresql
+fetch_and_deploy_gh_release "docmost" "docmost/docmost"
 
 msg_info "Setting up PostgreSQL"
 DB_NAME="docmost_db"
@@ -50,24 +42,21 @@ $STD sudo -u postgres psql -c "ALTER ROLE $DB_USER SET timezone TO 'UTC'"
 } >>~/docmost.creds
 msg_ok "Set up PostgreSQL"
 
-msg_info "Installing Docmost (Patience)"
-temp_file=$(mktemp)
-RELEASE=$(curl -fsSL https://api.github.com/repos/docmost/docmost/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-curl -fsSL "https://github.com/docmost/docmost/archive/refs/tags/v${RELEASE}.tar.gz" -o ""$temp_file""
-tar -xzf "$temp_file"
-mv docmost-${RELEASE} /opt/docmost
+msg_info "Configuring Docmost (Patience)"
 cd /opt/docmost
 mv .env.example .env
 mkdir data
 sed -i -e "s|APP_SECRET=.*|APP_SECRET=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | cut -c1-32)|" \
   -e "s|DATABASE_URL=.*|DATABASE_URL=postgres://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME|" \
   -e "s|FILE_UPLOAD_SIZE_LIMIT=.*|FILE_UPLOAD_SIZE_LIMIT=50mb|" \
+  -e "s|DRAWIO_URL=.*|DRAWIO_URL=https://embed.diagrams.net|" \
+  -e "s|DISABLE_TELEMETRY=.*|DISABLE_TELEMETRY=true|" \
+  -e "s|APP_URL=.*|APP_URL=http://$HOST_IP:3000|" \
   /opt/docmost/.env
 export NODE_OPTIONS="--max-old-space-size=2048"
 $STD pnpm install
 $STD pnpm build
-echo "${RELEASE}" >"/opt/${APPLICATION}_version.txt"
-msg_ok "Installed Docmost"
+msg_ok "Configured Docmost"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/docmost.service
@@ -91,7 +80,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -f "$temp_file"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

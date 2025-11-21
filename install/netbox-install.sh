@@ -14,10 +14,9 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
+$STD apt install -y \
   apache2 \
   redis-server \
-  postgresql \
   build-essential \
   libxml2-dev \
   libxslt1-dev \
@@ -27,8 +26,10 @@ $STD apt-get install -y \
   zlib1g-dev
 msg_ok "Installed Dependencies"
 
+PG_VERSION="16" setup_postgresql
+
 msg_info "Installing Python"
-$STD apt-get install -y \
+$STD apt install -y \
   python3 \
   python3-pip \
   python3-venv \
@@ -52,9 +53,10 @@ msg_ok "Set up PostgreSQL"
 msg_info "Installing NetBox (Patience)"
 cd /opt
 RELEASE=$(curl -fsSL https://api.github.com/repos/netbox-community/netbox/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-curl -fsSL "https://github.com/netbox-community/netbox/archive/refs/tags/v${RELEASE}.zip" -o $(basename "https://github.com/netbox-community/netbox/archive/refs/tags/v${RELEASE}.zip")
-unzip -q "v${RELEASE}.zip"
+curl -fsSL "https://github.com/netbox-community/netbox/archive/refs/tags/v${RELEASE}.zip" -o "v${RELEASE}.zip"
+$STD unzip "v${RELEASE}.zip"
 mv /opt/netbox-"${RELEASE}"/ /opt/netbox
+mkdir -p /opt/netbox/netbox/media
 
 $STD adduser --system --group netbox
 chown --recursive netbox /opt/netbox/netbox/media/
@@ -115,6 +117,7 @@ customize
 
 msg_info "Cleaning up"
 rm "/opt/v${RELEASE}.zip"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

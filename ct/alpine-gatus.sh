@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-256}"
 var_disk="${var_disk:-3}"
 var_os="${var_os:-alpine}"
-var_version="${var_version:-3.21}"
+var_version="${var_version:-3.22}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -24,7 +24,7 @@ function update_script() {
 
   if [[ ! -d /opt/gatus ]]; then
     msg_error "No ${APP} Installation Found!"
-    exit 1
+    exit
   fi
   RELEASE=$(curl -s https://api.github.com/repos/TwiN/gatus/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
   if [ "${RELEASE}" != "$(cat /opt/gatus_version.txt)" ] || [ ! -f /opt/gatus_version.txt ]; then
@@ -44,11 +44,10 @@ function update_script() {
     rm -f "$temp_file"
     echo "${RELEASE}" >/opt/gatus_version.txt
     $STD service gatus start
-    msg_ok "Updated Successfully"
+    msg_ok "Updated successfully!"
   else
     msg_ok "No update required. ${APP} is already at ${RELEASE}"
   fi
-
   exit 0
 }
 

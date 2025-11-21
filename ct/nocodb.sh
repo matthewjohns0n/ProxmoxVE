@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-1024}"
 var_disk="${var_disk:-4}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -20,22 +20,26 @@ color
 catch_errors
 
 function update_script() {
-    header_info
-    check_container_storage
-    check_container_resources
-    if [[ ! -f /etc/systemd/system/nocodb.service ]]; then
-        msg_error "No ${APP} Installation Found!"
-        exit
-    fi
-    msg_info "Updating ${APP}"
-    systemctl stop nocodb.service
-    cd /opt/nocodb
-    rm -rf nocodb
-    curl -fsSL http://get.nocodb.com/linux-x64 -o nocodb -L
-    chmod +x nocodb
-    systemctl start nocodb.service
-    msg_ok "Updated Successfully"
+  header_info
+  check_container_storage
+  check_container_resources
+  if [[ ! -f /etc/systemd/system/nocodb.service ]]; then
+    msg_error "No ${APP} Installation Found!"
     exit
+  fi
+  if check_for_gh_release "nocodb" "nocodb/nocodb"; then
+    msg_info "Stopping Service"
+    systemctl stop nocodb
+    msg_ok "Stopped Service"
+
+    fetch_and_deploy_gh_release "nocodb" "nocodb/nocodb" "singlefile" "latest" "/opt/nocodb/" "Noco-linux-x64"
+
+    msg_info "Starting Service"
+    systemctl start nocodb
+    msg_ok "Started Service"
+    msg_ok "Updated successfully!"
+  fi
+  exit
 }
 
 start

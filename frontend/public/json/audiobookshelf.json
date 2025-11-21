@@ -6,12 +6,12 @@
   ],
   "date_created": "2024-05-02",
   "type": "ct",
-  "updateable": false,
+  "updateable": true,
   "privileged": false,
   "interface_port": 13378,
   "documentation": "https://www.audiobookshelf.org/guides/",
   "website": "https://www.audiobookshelf.org/",
-  "logo": "https://raw.githubusercontent.com/loganmarchione/homelab-svg-assets/main/assets/audiobookshelf.svg",
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/webp/audiobookshelf.webp",
   "config_path": "/usr/share/audiobookshelf/config",
   "description": "Audiobookshelf is a Self-hosted audiobook and podcast server.",
   "install_methods": [
@@ -21,7 +21,7 @@
       "resources": {
         "cpu": 2,
         "ram": 2048,
-        "hdd": 4,
+        "hdd": 5,
         "os": "debian",
         "version": "12"
       }

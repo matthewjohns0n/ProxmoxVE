@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_disk="${var_disk:-2}"
 var_ram="${var_ram:-512}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 
 header_info "${APP}"
 variables
@@ -26,25 +26,18 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -fsSL https://api.github.com/repos/silverbulletmd/silverbullet/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-  if [[ ! -f "/opt/${APP}_version.txt" || "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
-    msg_info "Stopping ${APP}"
+
+  if check_for_gh_release "silverbullet" "silverbulletmd/silverbullet"; then
+    msg_info "Stopping Service"
     systemctl stop silverbullet
-    msg_ok "Stopped ${APP}"
+    msg_ok "Stopped Service"
 
-    msg_info "Updating ${APP} to v${RELEASE}"
-    curl -fsSL "https://github.com/silverbulletmd/silverbullet/releases/download/${RELEASE}/silverbullet-server-linux-x86_64.zip" -o $(basename "https://github.com/silverbulletmd/silverbullet/releases/download/${RELEASE}/silverbullet-server-linux-x86_64.zip")
-    unzip -q silverbullet-server-linux-x86_64.zip
-    mv silverbullet /opt/silverbullet/bin/
-    chmod +x /opt/silverbullet/bin/silverbullet
-    echo "${RELEASE}" >/opt/silverbullet/${APP}_version.txt
-    msg_ok "Updated ${APP} to v${RELEASE}"
+    fetch_and_deploy_gh_release "silverbullet" "silverbulletmd/silverbullet" "prebuild" "latest" "/opt/silverbullet/bin" "silverbullet-server-linux-x86_64.zip"
 
-    msg_info "Starting ${APP}"
+    msg_info "Starting Service"
     systemctl start silverbullet
-    msg_ok "Started ${APP}"
-  else
-    msg_ok "No update required. ${APP} is already at v${RELEASE}"
+    msg_ok "Started Service"
+    msg_ok "Updated successfully!"
   fi
   exit
 }

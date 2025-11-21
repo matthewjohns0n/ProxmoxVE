@@ -14,15 +14,15 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
-    default-jdk \
-    git \
-    git-lfs
+$STD apt install -y \
+  default-jdk \
+  git \
+  git-lfs
 msg_ok "Installed Dependencies"
 
 msg_info "Installing OneDev"
 cd /opt
-curl -fsSL "https://code.onedev.io/onedev/server/~site/onedev-latest.tar.gz" -o $(basename "https://code.onedev.io/onedev/server/~site/onedev-latest.tar.gz")
+curl -fsSL "https://code.onedev.io/onedev/server/~site/onedev-latest.tar.gz" -o "/opt/onedev-latest.tar.gz"
 tar -xzf onedev-latest.tar.gz
 mv /opt/onedev-latest /opt/onedev
 $STD /opt/onedev/bin/server.sh install
@@ -36,6 +36,7 @@ customize
 
 msg_info "Cleaning up"
 rm -rf /opt/onedev-latest.tar.gz
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

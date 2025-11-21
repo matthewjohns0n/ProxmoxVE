@@ -2,21 +2,42 @@
   "new script": [
     {
       "fileStatus": "added",
-      "includeGlobs": ["ct/**", "install/**", "misc/**", "turnkey/**", "vm/**"],
+      "includeGlobs": [
+        "ct/**",
+        "tools/**",
+        "install/**",
+        "misc/**",
+        "turnkey/**",
+        "vm/**"
+      ],
       "excludeGlobs": []
     }
   ],
   "update script": [
     {
       "fileStatus": "modified",
-      "includeGlobs": ["ct/**", "install/**", "misc/**", "turnkey/**", "vm/**"],
-      "excludeGlobs": ["misc/build.func", "misc/install.func", "misc/api.func"]
+      "includeGlobs": [
+        "ct/**",
+        "tools/**",
+        "install/**",
+        "misc/**",
+        "turnkey/**",
+        "vm/**"
+      ],
+      "excludeGlobs": []
     }
   ],
   "delete script": [
     {
       "fileStatus": "removed",
-      "includeGlobs": ["ct/**", "install/**", "misc/**", "turnkey/**", "vm/**"],
+      "includeGlobs": [
+        "ct/**",
+        "tools/**",
+        "install/**",
+        "misc/**",
+        "turnkey/**",
+        "vm/**"
+      ],
       "excludeGlobs": []
     }
   ],
@@ -24,11 +45,7 @@
     {
       "fileStatus": null,
       "includeGlobs": [
-        "*.md",
-        ".github/**",
-        "misc/*.func",
-        "ct/create_lxc.sh",
-        "api/**"
+        "*.md"
       ],
       "excludeGlobs": []
     }
@@ -36,54 +53,78 @@
   "core": [
     {
       "fileStatus": null,
-      "includeGlobs": ["misc/*.func", "ct/create_lxc.sh"],
-      "excludeGlobs": []
+      "includeGlobs": [
+        "misc/*.func",
+        "misc/create_lxc.sh"
+      ],
+      "excludeGlobs": [
+        "misc/api.func"
+      ]
     }
   ],
   "website": [
     {
       "fileStatus": null,
-      "includeGlobs": ["frontend/**"],
-      "excludeGlobs": []
+      "includeGlobs": [
+        "frontend/**"
+      ],
+      "excludeGlobs": [
+        "frontend/public/json/**"
+      ]
     }
   ],
   "api": [
     {
       "fileStatus": null,
-      "includeGlobs": ["api/**", "misc/api.func"],
+      "includeGlobs": [
+        "api/**",
+        "misc/api.func"
+      ],
       "excludeGlobs": []
     }
   ],
   "github": [
     {
       "fileStatus": null,
-      "includeGlobs": [".github/**"],
+      "includeGlobs": [
+        ".github/**"
+      ],
       "excludeGlobs": []
     }
   ],
   "json": [
     {
       "fileStatus": "modified",
-      "includeGlobs": ["frontend/public/json/**"],
-      "excludeGlobs": []
-    }
-  ],
-
-  "high risk": [
-    {
-      "fileStatus": null,
       "includeGlobs": [
-        "misc/build.func",
-        "misc/install.func",
-        "ct/create_lxc.sh"
+        "frontend/public/json/**"
       ],
       "excludeGlobs": []
     }
   ],
-  "documentation": [
+  "addon": [
     {
       "fileStatus": null,
-      "includeGlobs": ["*.md"],
+      "includeGlobs": [
+        "tools/addon/**"
+      ],
+      "excludeGlobs": []
+    }
+  ],
+  "pve-tool": [
+    {
+      "fileStatus": null,
+      "includeGlobs": [
+        "tools/pve/**"
+      ],
+      "excludeGlobs": []
+    }
+  ],
+  "vm": [
+    {
+      "fileStatus": null,
+      "includeGlobs": [
+        "vm/**"
+      ],
       "excludeGlobs": []
     }
   ]

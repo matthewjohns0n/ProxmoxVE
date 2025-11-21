@@ -13,28 +13,12 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y gnupg
-msg_ok "Installed Dependencies"
+NODE_VERSION="22" setup_nodejs
+fetch_and_deploy_gh_release "magicmirror" "MagicMirrorOrg/MagicMirror" "tarball"
 
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
-
-msg_info "Installing Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-msg_ok "Installed Node.js"
-
-msg_info "Setup MagicMirror"
-temp_file=$(mktemp)
-RELEASE=$(curl -fsSL https://api.github.com/repos/MagicMirrorOrg/MagicMirror/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-curl -fsSL "https://github.com/MagicMirrorOrg/MagicMirror/archive/refs/tags/v${RELEASE}.tar.gz" -o ""$temp_file""
-tar -xzf "$temp_file"
-mv MagicMirror-${RELEASE} /opt/magicmirror
+msg_info "Configuring MagicMirror"
 cd /opt/magicmirror
+sed -i -E 's/("postinstall": )".*"/\1""/; s/("prepare": )".*"/\1""/' package.json
 $STD npm run install-mm
 cat <<EOF >/opt/magicmirror/config/config.js
 let config = {
@@ -125,8 +109,7 @@ let config = {
 /*************** DO NOT EDIT THE LINE BELOW ***************/
 if (typeof module !== "undefined") {module.exports = config;}
 EOF
-echo "${RELEASE}" >"/opt/${APPLICATION}_version.txt"
-msg_ok "Setup MagicMirror"
+msg_ok "Configured MagicMirror"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/magicmirror.service
@@ -146,14 +129,14 @@ ExecStart=/usr/bin/npm run server
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl enable --now magicmirror
+systemctl enable -q --now magicmirror
 msg_ok "Created Service"
 
 motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -rf $temp_file
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

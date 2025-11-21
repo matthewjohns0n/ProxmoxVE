@@ -10,8 +10,8 @@
   "privileged": false,
   "interface_port": 80,
   "documentation": null,
-  "website": "https://it-tools.tech/",
-  "logo": "https://raw.githubusercontent.com/CorentinTh/it-tools/08d977b8cdb7ffb76adfa18ba6eb4b73795ec814/public/safari-pinned-tab.svg",
+  "website": "https://sharevb-it-tools.vercel.app/",
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/webp/it-tools.webp",
   "config_path": "",
   "description": "IT-Tools is a web-based suite of utilities designed to streamline and simplify various IT tasks, providing tools for developers and system administrators to manage their workflows efficiently.",
   "install_methods": [
@@ -21,9 +21,9 @@
       "resources": {
         "cpu": 1,
         "ram": 256,
-        "hdd": 0.5,
+        "hdd": 1,
         "os": "alpine",
-        "version": "3.21"
+        "version": "3.22"
       }
     },
     {
@@ -32,9 +32,9 @@
       "resources": {
         "cpu": 1,
         "ram": 256,
-        "hdd": 0.5,
+        "hdd": 1,
         "os": "alpine",
-        "version": "3.21"
+        "version": "3.22"
       }
     }
   ],

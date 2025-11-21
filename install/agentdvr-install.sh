@@ -14,12 +14,12 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y unzip
-$STD apt-get install -y apt-transport-https
-$STD apt-get install -y alsa-utils
-$STD apt-get install -y libxext-dev
-$STD apt-get install -y fontconfig
-$STD apt-get install -y libva-drm2
+$STD apt install -y \
+  apt-transport-https \
+  alsa-utils \
+  libxext-dev \
+  fontconfig \
+  libva-drm2
 msg_ok "Installed Dependencies"
 
 msg_info "Installing AgentDVR"
@@ -28,8 +28,8 @@ RELEASE=$(curl -fsSL "https://www.ispyconnect.com/api/Agent/DownloadLocation4?pl
 cd /opt/agentdvr/agent
 curl -fsSL "$RELEASE" -o $(basename "$RELEASE")
 $STD unzip Agent_Linux64*.zip
-rm -rf Agent_Linux64*.zip
 chmod +x ./Agent
+echo $RELEASE >~/.agentdvr
 msg_ok "Installed AgentDVR"
 
 msg_info "Creating Service"
@@ -55,6 +55,8 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+rm -rf Agent_Linux64*.zip
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

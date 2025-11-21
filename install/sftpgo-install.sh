@@ -14,32 +14,29 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y gpg
-$STD apt-get install -y sqlite3
+$STD apt install -y sqlite3
 msg_ok "Installed Dependencies"
 
-msg_info "Installing Golang"
-set +o pipefail
-temp_file=$(mktemp)
-golang_tarball=$(curl -fsSL https://go.dev/dl/ | grep -oP 'go[\d\.]+\.linux-amd64\.tar\.gz' | head -n 1)
-curl -fsSL "https://golang.org/dl/${golang_tarball}" -o "$temp_file"
-tar -C /usr/local -xzf "$temp_file"
-ln -sf /usr/local/go/bin/go /usr/local/bin/go
-rm -f "$temp_file"
-set -o pipefail
-msg_ok "Installed Golang"
+setup_go
 
 msg_info "Installing SFTPGo"
 curl -fsSL https://ftp.osuosl.org/pub/sftpgo/apt/gpg.key | gpg --dearmor -o /usr/share/keyrings/sftpgo-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/sftpgo-archive-keyring.gpg] https://ftp.osuosl.org/pub/sftpgo/apt bookworm main" >/etc/apt/sources.list.d/sftpgo.list
-$STD apt-get update
-$STD apt-get install -y sftpgo
+cat <<EOF >/etc/apt/sources.list.d/sftpgo.sources
+Types: deb
+URIs: https://ftp.osuosl.org/pub/sftpgo/apt
+Suites: bookworm
+Components: main
+Signed-By: /usr/share/keyrings/sftpgo-archive-keyring.gpg
+EOF
+$STD apt update
+$STD apt install -y sftpgo
 msg_ok "Installed SFTPGo"
 
 motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

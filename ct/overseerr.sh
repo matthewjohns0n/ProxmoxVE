@@ -8,10 +8,10 @@ source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxV
 APP="Overseerr"
 var_tags="${var_tags:-media}"
 var_cpu="${var_cpu:-2}"
-var_ram="${var_ram:-2048}"
+var_ram="${var_ram:-4096}"
 var_disk="${var_disk:-8}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -27,20 +27,30 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  msg_info "Updating $APP"
-  systemctl stop overseerr
-  cd /opt/overseerr
-  output=$(git pull)
-  $STD git pull
-  if echo "$output" | grep -q "Already up to date."; then
-    msg_ok " $APP is already up to date."
+  if check_for_gh_release "overseerr" "sct/overseerr"; then
+    msg_info "Stopping Service"
+    systemctl stop overseerr
+    msg_ok "Service stopped"
+
+    msg_info "Creating backup"
+    mv /opt/overseerr/config /opt/config_backup
+    msg_ok "Backup created"
+
+    fetch_and_deploy_gh_release "overseerr" "sct/overseerr" "tarball"
+    rm -rf /opt/overseerr/config
+
+    msg_info "Configuring ${APP} (Patience)"
+    cd /opt/overseerr
+    $STD yarn install
+    $STD yarn build
+    mv /opt/config_backup /opt/overseerr/config
+    msg_ok "Configured ${APP}"
+
+    msg_info "Starting Service"
     systemctl start overseerr
-    exit
+    msg_ok "Started Service"
+    msg_ok "Updated successfully!"
   fi
-  $STD yarn install
-  $STD yarn build
-  systemctl start overseerr
-  msg_ok "Updated $APP"
   exit
 }
 

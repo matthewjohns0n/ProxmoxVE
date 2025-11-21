@@ -13,14 +13,7 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Ombi"
-RELEASE=$(curl -fsSL https://api.github.com/repos/Ombi-app/Ombi/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
-curl -fsSL "https://github.com/Ombi-app/Ombi/releases/download/${RELEASE}/linux-x64.tar.gz" -o $(basename "https://github.com/Ombi-app/Ombi/releases/download/${RELEASE}/linux-x64.tar.gz")
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
-mkdir -p /opt/ombi
-tar -xzf linux-x64.tar.gz -C /opt/ombi
-rm -rf linux-x64.tar.gz
-msg_ok "Installed Ombi"
+fetch_and_deploy_gh_release "ombi" "Ombi-app/Ombi" "prebuild" "latest" "/opt/ombi" "linux-x64.tar.gz"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/ombi.service
@@ -43,6 +36,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

@@ -6,12 +6,12 @@
   ],
   "date_created": "2024-05-02",
   "type": "ct",
-  "updateable": false,
+  "updateable": true,
   "privileged": false,
   "interface_port": 8080,
   "documentation": "https://owncast.online/docs/",
   "website": "https://owncast.online/",
-  "logo": "https://raw.githubusercontent.com/selfhst/icons/refs/heads/main/svg/owncast.svg",
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/webp/owncast.webp",
   "config_path": "",
   "description": "Owncast is a free and open source live video and web chat server for use with existing popular broadcasting software.",
   "install_methods": [
@@ -23,7 +23,7 @@
         "ram": 2048,
         "hdd": 2,
         "os": "debian",
-        "version": "12"
+        "version": "13"
       }
     }
   ],

@@ -13,17 +13,10 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y \
-  ca-certificates \
-  software-properties-common \
-  apt-transport-https \
-  lsb-release \
-  php-{opcache,curl,gd,mbstring,xml,bcmath,intl,zip,xsl,pgsql} \
-  libapache2-mod-php \
-  composer \
-  postgresql
-msg_ok "Installed Dependencies"
+NODE_VERSION="22" NODE_MODULE="yarn@latest" setup_nodejs
+PG_VERSION="16" setup_postgresql
+PHP_VERSION="8.4" PHP_APACHE="YES" PHP_MODULE="xsl,pgsql" setup_php
+setup_composer
 
 msg_info "Setting up PHP"
 PHPVER=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION . "\n";')
@@ -45,21 +38,11 @@ $STD sudo -u postgres psql -c "CREATE DATABASE $DB_NAME WITH OWNER $DB_USER TEMP
 } >>~/partdb.creds
 msg_ok "Set up PostgreSQL"
 
-msg_info "Setting up Node.js/Yarn"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-$STD apt-get update
-$STD apt-get install -y nodejs
-$STD npm install -g npm@latest
-$STD npm install -g yarn
-msg_ok "Installed Node.js/Yarn"
-
 msg_info "Installing Part-DB (Patience)"
 cd /opt
 RELEASE=$(curl -fsSL https://api.github.com/repos/Part-DB/Part-DB-server/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-curl -fsSL "https://github.com/Part-DB/Part-DB-server/archive/refs/tags/v${RELEASE}.zip" -o $(basename "https://github.com/Part-DB/Part-DB-server/archive/refs/tags/v${RELEASE}.zip")
-unzip -q "v${RELEASE}.zip"
+curl -fsSL "https://github.com/Part-DB/Part-DB-server/archive/refs/tags/v${RELEASE}.zip" -o "/opt/v${RELEASE}.zip"
+$STD unzip "v${RELEASE}.zip"
 mv /opt/Part-DB-server-${RELEASE}/ /opt/partdb
 
 cd /opt/partdb/
@@ -109,6 +92,7 @@ customize
 msg_info "Cleaning up"
 rm -rf ~/database-migration-output
 rm -rf "/opt/v${RELEASE}.zip"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

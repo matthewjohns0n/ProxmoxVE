@@ -11,7 +11,8 @@ var_cpu="${var_cpu:-2}"
 var_disk="${var_disk:-8}"
 var_ram="${var_ram:-1024}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
+var_unprivileged="${var_unprivileged:-1}"
 
 header_info "${APP}"
 variables
@@ -26,32 +27,30 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE="$(curl -fsSL https://api.github.com/repos/toniebox-reverse-engineering/teddycloud/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')"
-  VERSION="${RELEASE#tc_v}"
-  if [[ ! -f "/opt/${APP}_version.txt" || "${VERSION}" != "$(cat /opt/${APP}_version.txt)" ]]; then
-    msg_info "Stopping ${APP}"
+
+  if check_for_gh_release "teddycloud" "toniebox-reverse-engineering/teddycloud"; then
+    msg_info "Stopping Service"
     systemctl stop teddycloud
-    msg_ok "Stopped ${APP}"
+    msg_ok "Stopped Service"
 
-    msg_info "Updating ${APP} to v${VERSION}"
-    cd /opt
+    msg_info "Creating backup"
     mv /opt/teddycloud /opt/teddycloud_bak
-    curl -fsSL "https://github.com/toniebox-reverse-engineering/teddycloud/releases/download/${RELEASE}/teddycloud.amd64.release_v${VERSION}.zip" -o $(basename "https://github.com/toniebox-reverse-engineering/teddycloud/releases/download/${RELEASE}/teddycloud.amd64.release_v${VERSION}.zip")
-    unzip -q -d /opt/teddycloud teddycloud.amd64.release_v${VERSION}.zip
-    cp -R /opt/teddycloud_bak/certs /opt/teddycloud_bak/config /opt/teddycloud_bak/data /opt/teddycloud
-    echo "${VERSION}" >"/opt/${APP}_version.txt"
-    msg_ok "Updated ${APP} to v${VERSION}"
+    msg_ok "Backup created"
 
-    msg_info "Starting ${APP}"
+    CLEAN_INSTALL=1 fetch_and_deploy_gh_release "teddycloud" "toniebox-reverse-engineering/teddycloud" "prebuild" "latest" "/opt/teddycloud" "teddycloud.amd64.release*.zip"
+
+    msg_info "Restoring data"
+    cp -R /opt/teddycloud_bak/certs /opt/teddycloud_bak/config /opt/teddycloud_bak/data /opt/teddycloud
+    msg_ok "Data restored"
+
+    msg_info "Starting Service"
     systemctl start teddycloud
-    msg_ok "Started ${APP}"
+    msg_ok "Started Service"
 
     msg_info "Cleaning up"
-    rm -rf /opt/teddycloud.amd64.release_v${VERSION}.zip
     rm -rf /opt/teddycloud_bak
-    msg_ok "Cleaned"
-  else
-    msg_ok "No update required. ${APP} is already at v${VERSION}"
+    msg_ok "Cleaned up"
+    msg_ok "Updated successfully!"
   fi
   exit
 }

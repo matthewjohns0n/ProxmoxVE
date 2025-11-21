@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-2}"
 var_ram="${var_ram:-2048}"
 var_disk="${var_disk:-8}"
 var_os="${var_os:-ubuntu}"
-var_version="${var_version:-22.04}"
+var_version="${var_version:-24.04}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -23,25 +23,23 @@ function update_script() {
   header_info
   check_container_storage
   check_container_resources
+
   if [[ ! -d /opt/emby-server ]]; then
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  LATEST=$(curl -fsSL https://api.github.com/repos/MediaBrowser/Emby.Releases/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
-  msg_info "Stopping ${APP}"
-  systemctl stop emby-server
-  msg_ok "Stopped ${APP}"
+  if check_for_gh_release "emby" "MediaBrowser/Emby.Releases"; then
+    msg_info "Stopping Service"
+    systemctl stop emby-server
+    msg_ok "Stopped Service"
 
-  msg_info "Updating ${APP}"
-  $STD curl -fsSL "https://github.com/MediaBrowser/Emby.Releases/releases/download/${LATEST}/emby-server-deb_${LATEST}_amd64.deb" -o "emby-server-deb_${LATEST}_amd64.deb"
-  $STD dpkg -i "emby-server-deb_${LATEST}_amd64.deb"
-  rm "emby-server-deb_${LATEST}_amd64.deb"
-  msg_ok "Updated ${APP}"
+    fetch_and_deploy_gh_release "emby" "MediaBrowser/Emby.Releases" "binary"
 
-  msg_info "Starting ${APP}"
-  systemctl start emby-server
-  msg_ok "Started ${APP}"
-  msg_ok "Updated Successfully"
+    msg_info "Starting Service"
+    systemctl start emby-server
+    msg_ok "Started Service"
+    msg_ok "Updated successfully!"
+  fi
   exit
 }
 

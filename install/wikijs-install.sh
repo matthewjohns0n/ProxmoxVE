@@ -14,31 +14,15 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
-  git \
-  gpg
+$STD apt install -y \
+  git
 msg_ok "Installed Dependencies"
 
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
-
-msg_info "Setting up PostgreSQL Repository"
-curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
-echo "deb https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" >/etc/apt/sources.list.d/pgdg.list
-msg_ok "Set up PostgreSQL Repository"
-
-msg_info "Installing Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-$STD npm install --global yarn
-$STD npm install -g node-gyp
-msg_ok "Installed Node.js"
+NODE_VERSION="22" NODE_MODULE="yarn,node-gyp" setup_nodejs
+PG_VERSION="17" setup_postgresql
+fetch_and_deploy_gh_release "wikijs" "requarks/wiki" "prebuild" "latest" "/opt/wikijs" "wiki-js.tar.gz"
 
 msg_info "Set up PostgreSQL"
-$STD apt-get install -y postgresql-17
 DB_NAME="wiki"
 DB_USER="wikijs_user"
 DB_PASS="$(openssl rand -base64 18 | tr -dc 'a-zA-Z0-9' | cut -c1-13)"
@@ -56,17 +40,11 @@ $STD sudo -u postgres psql -c "ALTER ROLE $DB_USER SET timezone TO 'UTC';"
 } >>~/wikijs.creds
 msg_ok "Set up PostgreSQL"
 
-msg_info "Setup Wiki.js"
-temp_file=$(mktemp)
-RELEASE=$(curl -fsSL https://api.github.com/repos/Requarks/wiki/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-curl -fsSL "https://github.com/requarks/wiki/releases/download/v${RELEASE}/wiki-js.tar.gz" -o ""$temp_file""
-mkdir /opt/wikijs
-tar -xzf "$temp_file" -C /opt/wikijs
+msg_info "Configuring Wiki.js"
 mv /opt/wikijs/config.sample.yml /opt/wikijs/config.yml
 sed -i -E 's|^( *user: ).*|\1'"$DB_USER"'|' /opt/wikijs/config.yml
 sed -i -E 's|^( *pass: ).*|\1'"$DB_PASS"'|' /opt/wikijs/config.yml
-echo "${RELEASE}" >"/opt/${APPLICATION}_version.txt"
-msg_ok "Installed Wiki.js"
+msg_ok "Configured Wiki.js"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/wikijs.service
@@ -92,7 +70,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -f "$temp_file"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

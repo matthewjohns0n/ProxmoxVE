@@ -9,28 +9,27 @@
   "updateable": true,
   "privileged": false,
   "interface_port": 3000,
-  "documentation": null,
+  "documentation": "https://github.com/clusterzx/paperless-ai/wiki/1.-Home",
   "website": "https://github.com/clusterzx/paperless-ai",
-  "logo": "https://raw.githubusercontent.com/clusterzx/paperless-ai/refs/heads/main/icon.png",
-    "config_path": "/opt/paperless-ai/data/.env",
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/webp/paperless-ai.webp",
+  "config_path": "/opt/paperless-ai/data/.env",
   "description": "An automated document analyzer for Paperless-ngx using OpenAI API, Ollama and all OpenAI API compatible Services to automatically analyze and tag your documents.It features: Automode, Manual Mode, Ollama and OpenAI, a Chat function to query your documents with AI, a modern and intuitive Webinterface.",
   "install_methods": [
     {
       "type": "default",
       "script": "ct/paperless-ai.sh",
       "resources": {
-        "cpu": 2,
-        "ram": 2048,
-        "hdd": 5,
+        "cpu": 4,
+        "ram": 4096,
+        "hdd": 20,
         "os": "debian",
-        "version": "12"
+        "version": "13"
       }
     }
-    ],
-    "default_credentials": {
-        "username": null,
-        "password": null
-    },
-    "notes": []
+  ],
+  "default_credentials": {
+    "username": null,
+    "password": null
+  },
+  "notes": []
 }
-

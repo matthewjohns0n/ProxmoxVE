@@ -152,7 +152,7 @@ Example for a git release:
 
 ```bash
 RELEASE=$(curl -fsSL https://api.github.com/repos/snipe/snipe-it/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-wget -q "https://github.com/snipe/snipe-it/archive/refs/tags/v${RELEASE}.zip"
+curl -fsSL "https://github.com/snipe/snipe-it/archive/refs/tags/v${RELEASE}.zip" -o "v${RELEASE}.zip"
 ```
 
 ### 5.2 **Save the version for update checks**
@@ -163,7 +163,7 @@ wget -q "https://github.com/snipe/snipe-it/archive/refs/tags/v${RELEASE}.zip"
 Example:
 
 ```bash
-echo "${RELEASE}" >"/opt/AppName_version.txt"
+echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
 ```
 
 ---
@@ -184,7 +184,7 @@ msg_info "Installing Dependencies"
 $STD apt-get install -y ...
 msg_ok "Installed Dependencies"
 
-read -p "Do you wish to enable HTTPS mode? (y/N): " httpschoice
+read -p "${TAB3}Do you wish to enable HTTPS mode? (y/N): " httpschoice
 ```
 
 ### 6.2 **Verbosity**

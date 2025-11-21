@@ -9,7 +9,7 @@ APP="ESPHome"
 var_tags="${var_tags:-automation}"
 var_cpu="${var_cpu:-2}"
 var_ram="${var_ram:-1024}"
-var_disk="${var_disk:-4}"
+var_disk="${var_disk:-10}"
 var_os="${var_os:-debian}"
 var_version="${var_version:-12}"
 var_unprivileged="${var_unprivileged:-1}"
@@ -27,21 +27,61 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  msg_info "Stopping ESPHome"
+
+  msg_info "Stopping Service"
   systemctl stop esphomeDashboard
-  msg_ok "Stopped ESPHome"
+  msg_ok "Stopped Service"
 
-  msg_info "Updating ESPHome"
-  if [[ -d /srv/esphome ]]; then
-    $STD source /srv/esphome/bin/activate
+  VENV_PATH="/opt/esphome/.venv"
+  ESPHOME_BIN="${VENV_PATH}/bin/esphome"
+  export PYTHON_VERSION="3.12"
+
+  if [[ ! -d "$VENV_PATH" || ! -x "$ESPHOME_BIN" ]]; then
+    PYTHON_VERSION="3.12" setup_uv
+    msg_info "Migrating to uv/venv"
+    rm -rf "$VENV_PATH"
+    mkdir -p /opt/esphome
+    cd /opt/esphome
+    $STD uv venv "$VENV_PATH"
+    $STD "$VENV_PATH/bin/python" -m ensurepip --upgrade
+    $STD "$VENV_PATH/bin/python" -m pip install --upgrade pip
+    $STD "$VENV_PATH/bin/python" -m pip install esphome tornado esptool
+    msg_ok "Migrated to uv/venv"
+  else
+    msg_info "Updating ESPHome"
+    PYTHON_VERSION="3.12" setup_uv
+    $STD "$VENV_PATH/bin/python" -m pip install --upgrade esphome tornado esptool
+    msg_ok "Updated ESPHome"
   fi
-  $STD pip3 install -U esphome
-  msg_ok "Updated ESPHome"
+  SERVICE_FILE="/etc/systemd/system/esphomeDashboard.service"
+  if ! grep -q "${VENV_PATH}/bin/esphome" "$SERVICE_FILE"; then
+    msg_info "Updating systemd service"
+    cat <<EOF >"$SERVICE_FILE"
+[Unit]
+Description=ESPHome Dashboard
+After=network.target
 
-  msg_info "Starting ESPHome"
+[Service]
+ExecStart=${VENV_PATH}/bin/esphome dashboard /root/config/
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    $STD systemctl daemon-reload
+    msg_ok "Updated systemd service"
+  fi
+
+  msg_info "Linking esphome to /usr/local/bin"
+  rm -f /usr/local/bin/esphome
+  ln -s /opt/esphome/.venv/bin/esphome /usr/local/bin/esphome
+  msg_ok "Linked esphome binary"
+
+  msg_info "Starting Service"
   systemctl start esphomeDashboard
-  msg_ok "Started ESPHome"
-  msg_ok "Updated Successfully"
+  msg_ok "Started Service"
+  msg_ok "Updated successfully!"
   exit
 }
 

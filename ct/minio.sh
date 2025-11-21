@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-1024}"
 var_disk="${var_disk:-5}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -27,29 +27,46 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
+  FEATURE_RICH_VERSION="2025-04-22T22-12-26Z"
   RELEASE=$(curl -fsSL https://api.github.com/repos/minio/minio/releases/latest | grep '"tag_name"' | awk -F '"' '{print $4}')
-  if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
-    msg_info "Stopping ${APP}"
+  CURRENT_VERSION=""
+  [[ -f /opt/${APP}_version.txt ]] && CURRENT_VERSION=$(cat /opt/${APP}_version.txt)
+  RELEASE=$(curl -fsSL https://api.github.com/repos/minio/minio/releases/latest | grep '"tag_name"' | awk -F '"' '{print $4}')
+
+  if [[ "${CURRENT_VERSION}" == "${FEATURE_RICH_VERSION}" && "${RELEASE}" != "${FEATURE_RICH_VERSION}" ]]; then
+    echo
+    echo "You are currently running the last feature-rich community version: ${FEATURE_RICH_VERSION}"
+    echo "WARNING: Updating to the latest version will REMOVE most management features from the Console UI."
+    echo "Do you still want to upgrade to the latest version? [y/N]: "
+    read -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      msg_ok "No update performed. Staying on the feature-rich version."
+      exit
+    fi
+  fi
+
+  if [[ "${CURRENT_VERSION}" != "${RELEASE}" ]]; then
+    msg_info "Stopping Service"
     systemctl stop minio
-    msg_ok "${APP} Stopped"
+    msg_ok "Stopped Service"
 
     msg_info "Updating ${APP} to ${RELEASE}"
     mv /usr/local/bin/minio /usr/local/bin/minio_bak
-    curl -fsSL "https://dl.min.io/server/minio/release/linux-amd64/minio" -o $(basename "https://dl.min.io/server/minio/release/linux-amd64/minio")
-    mv minio /usr/local/bin/
+    curl -fsSL "https://dl.min.io/server/minio/release/linux-amd64/minio" -o /usr/local/bin/minio
     chmod +x /usr/local/bin/minio
     echo "${RELEASE}" >/opt/${APP}_version.txt
     msg_ok "Updated ${APP}"
 
-    msg_info "Starting ${APP}"
+    msg_info "Starting Service"
     systemctl start minio
-    msg_ok "Started ${APP}"
+    msg_ok "Started Service"
 
     msg_info "Cleaning up"
     rm -f /usr/local/bin/minio_bak
     msg_ok "Cleaned"
 
-    msg_ok "Updated Successfully"
+    msg_ok "Updated successfully!"
   else
     msg_ok "No update required. ${APP} is already at ${RELEASE}"
   fi

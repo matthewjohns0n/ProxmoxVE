@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-2}"
 var_ram="${var_ram:-2048}"
 var_disk="${var_disk:-7}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -27,9 +27,11 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  if cd /usr/local/searxng/searxng-src && git pull | grep -q 'Already up to date'; then
-    msg_ok "There is currently no update available."
-  fi
+  msg_ok "There is currently no update available."
+  # sed -i 's/^\([[:space:]]*limiter:\)[[:space:]]*true/\1 false/' /etc/searxng/settings.yml
+  # if cd /usr/local/searxng/searxng-src && git pull | grep -q 'Already up to date'; then
+  #   msg_ok "There is currently no update available."
+  # fi
   exit
 }
 start

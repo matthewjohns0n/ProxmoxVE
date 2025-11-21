@@ -14,52 +14,8 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y \
-  build-essential \
-  git \
-  tzdata
-msg_ok "Installed Dependencies"
-
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
-
-msg_info "Installing Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-msg_ok "Installed Node.js"
-
-msg_info "Installing pnpm"
-$STD npm install -g pnpm
-msg_ok "Installed pnpm"
-
-msg_info "Installing Golang"
-set +o pipefail
-temp_file=$(mktemp)
-golang_tarball=$(curl -fsSL https://go.dev/dl/ | grep -oP 'go[\d\.]+\.linux-amd64\.tar\.gz' | head -n 1)
-curl -fsSL "https://golang.org/dl/${golang_tarball}" -o "$temp_file"
-tar -C /usr/local -xzf "$temp_file"
-ln -sf /usr/local/go/bin/go /usr/local/bin/go
-rm -f "$temp_file"
-set -o pipefail
-msg_ok "Installed Golang"
-
-msg_info "Installing Memos (Patience)"
+fetch_and_deploy_gh_release "memos" "usememos/memos" "prebuild" "latest" "/opt/memos" "memos*linux_amd64.tar.gz"
 mkdir -p /opt/memos_data
-export NODE_OPTIONS="--max-old-space-size=2048"
-$STD git clone https://github.com/usememos/memos.git /opt/memos
-cd /opt/memos/web
-$STD pnpm i --frozen-lockfile
-$STD pnpm build
-cd /opt/memos
-mkdir -p /opt/memos/server/dist
-cp -r web/dist/* /opt/memos/server/dist/
-cp -r web/dist/* /opt/memos/server/router/frontend/dist/
-$STD go build -o /opt/memos/memos -tags=embed bin/memos/main.go
-msg_ok "Installed Memos"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/memos.service
@@ -85,6 +41,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

@@ -13,19 +13,14 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Jackett"
-RELEASE=$(curl -fsSL https://github.com/Jackett/Jackett/releases/latest | grep "title>Release" | cut -d " " -f 4)
-curl -fsSL "https://github.com/Jackett/Jackett/releases/download/$RELEASE/Jackett.Binaries.LinuxAMDx64.tar.gz" -o $(basename "https://github.com/Jackett/Jackett/releases/download/$RELEASE/Jackett.Binaries.LinuxAMDx64.tar.gz")
-tar -xzf Jackett.Binaries.LinuxAMDx64.tar.gz -C /opt
-rm -rf Jackett.Binaries.LinuxAMDx64.tar.gz
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
-msg_ok "Installed Jackett"
+fetch_and_deploy_gh_release "jackett" "Jackett/Jackett" "prebuild" "latest" "/opt/Jackett" "Jackett.Binaries.LinuxAMDx64.tar.gz"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/jackett.service
 [Unit]
 Description=Jackett Daemon
 After=network.target
+
 [Service]
 SyslogIdentifier=jackett
 Restart=always
@@ -34,7 +29,8 @@ Type=simple
 WorkingDirectory=/opt/Jackett
 ExecStart=/bin/sh /opt/Jackett/jackett_launcher.sh
 TimeoutStopSec=30
-Environment="DisableRootWarning=true"
+EnvironmentFile="/opt/.env"
+
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -43,8 +39,4 @@ msg_ok "Created Service"
 
 motd_ssh
 customize
-
-msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
-msg_ok "Cleaned"
+cleanup_lxc

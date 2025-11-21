@@ -27,17 +27,26 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  msg_info "Updating ${APP}"
 
-  if ! dpkg -s aspnetcore-runtime-8.0 >/dev/null 2>&1; then
-    curl -fsSL "https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb" -o $(basename "https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb")
-    $STD dpkg -i packages-microsoft-prod.deb
-    $STD apt-get update
-    $STD apt-get install -y aspnetcore-runtime-8.0
-    rm packages-microsoft-prod.deb
+  if is_package_installed "aspnetcore-runtime-8.0"; then
+    $STD apt remove -y aspnetcore-runtime-8.0
+    $STD apt install -y aspnetcore-runtime-9.0
   fi
-  $STD bash <(curl -fsSL https://download.technitium.com/dns/install.sh)
-  msg_ok "Updated Successfully"
+
+  RELEASE=$(curl -fsSL https://technitium.com/dns/ | grep -oP 'Version \K[\d.]+')
+  if [[ ! -f ~/.technitium || "${RELEASE}" != "$(cat ~/.technitium)" ]]; then
+    msg_info "Updating Technitium DNS"
+    curl -fsSL "https://download.technitium.com/dns/DnsServerPortable.tar.gz" -o /opt/DnsServerPortable.tar.gz
+    $STD tar zxvf /opt/DnsServerPortable.tar.gz -C /opt/technitium/dns/
+    msg_ok "Updated Technitium DNS"
+
+    msg_info "Cleaning up"
+    rm -f /opt/DnsServerPortable.tar.gz
+    msg_ok "Cleaned up"
+    msg_ok "Updated successfully!"
+  else
+    msg_ok "No update required.  Technitium DNS is already at v${RELEASE}."
+  fi
   exit
 }
 

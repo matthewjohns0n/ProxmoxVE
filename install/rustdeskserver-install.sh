@@ -13,26 +13,16 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Setup RustDesk"
-
-RELEASE=$(curl -fsSL https://api.github.com/repos/rustdesk/rustdesk-server/releases/latest | grep "tag_name" | awk -F '"' '{print $4}')
-TEMPDIR=$(mktemp -d)
-
-curl -fsSL "https://github.com/rustdesk/rustdesk-server/releases/download/${RELEASE}/rustdesk-server-hbbr_${RELEASE}_amd64.deb" \
-    -o "${TEMPDIR}/rustdesk-server-hbbr_${RELEASE}_amd64.deb"
-curl -fsSL "https://github.com/rustdesk/rustdesk-server/releases/download/${RELEASE}/rustdesk-server-hbbs_${RELEASE}_amd64.deb" \
-    -o "${TEMPDIR}/rustdesk-server-hbbs_${RELEASE}_amd64.deb"
-curl -fsSL "https://github.com/rustdesk/rustdesk-server/releases/download/${RELEASE}/rustdesk-server-utils_${RELEASE}_amd64.deb" \
-    -o "${TEMPDIR}/rustdesk-server-utils_${RELEASE}_amd64.deb"
-$STD dpkg -i "${TEMPDIR}"/*.deb
-echo "${RELEASE}" >/opt/rustdesk_version.txt
-msg_ok "Setup RustDesk"
+fetch_and_deploy_gh_release "rustdesk-hbbr" "rustdesk/rustdesk-server" "binary" "latest" "/opt/rustdesk" "rustdesk-server-hbbr*amd64.deb"
+fetch_and_deploy_gh_release "rustdesk-hbbs" "rustdesk/rustdesk-server" "binary" "latest" "/opt/rustdesk" "rustdesk-server-hbbs*amd64.deb"
+fetch_and_deploy_gh_release "rustdesk-utils" "rustdesk/rustdesk-server" "binary" "latest" "/opt/rustdesk" "rustdesk-server-utils*amd64.deb"
+fetch_and_deploy_gh_release "rustdesk-api" "lejianwen/rustdesk-api" "binary" "latest" "/opt/rustdesk" "rustdesk-api-server*amd64.deb"
 
 motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -rf $TEMPDIR
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

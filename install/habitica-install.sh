@@ -14,36 +14,27 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
-    libkrb5-dev \
-    gnupg \
-    build-essential \
-    git
-curl -fsSL "http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb" -o $(basename "http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb")
+$STD apt install -y \
+  libkrb5-dev \
+  build-essential \
+  git
+curl -fsSL "http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb" -o "libssl1.1_1.1.1f-1ubuntu2_amd64.deb"
 $STD dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
 msg_ok "Installed Dependencies"
 
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
-
-msg_info "Setup Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-msg_ok "Setup Node.js"
+NODE_VERSION="20" NODE_MODULE="gulp-cli,mocha,npm@10" setup_nodejs
+fetch_and_deploy_gh_release "habitica" "HabitRPG/habitica" "tarball" "latest" "/opt/habitica"
 
 msg_info "Setup ${APPLICATION}"
-temp_file=$(mktemp)
-RELEASE=$(curl -fsSL https://api.github.com/repos/HabitRPG/habitica/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-curl -fsSL "https://github.com/HabitRPG/habitica/archive/refs/tags/v${RELEASE}.tar.gz" -o "$temp_file"
-tar zxf $temp_file
-mv habitica-${RELEASE}/ /opt/habitica
+IPADDRESS=$(hostname -I | awk '{print $1}')
 cd /opt/habitica
 $STD npm i
+$STD npm run postinstall
 cp config.json.example config.json
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
+sed -i "s/\"TRUSTED_DOMAINS\": \"/&http:\/\/$IPADDRESS:3000,/" config.json
+$STD npm run client:build
+$STD gulp build:prod
+
 msg_ok "Setup ${APPLICATION}"
 
 msg_info "Creating Service"
@@ -99,9 +90,4 @@ msg_ok "Created Service"
 
 motd_ssh
 customize
-
-msg_info "Cleaning up"
-rm -f $temp_file
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
-msg_ok "Cleaned"
+cleanup_lxc

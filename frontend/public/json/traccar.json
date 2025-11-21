@@ -6,12 +6,12 @@
   ],
   "date_created": "2024-05-02",
   "type": "ct",
-  "updateable": false,
+  "updateable": true,
   "privileged": false,
   "interface_port": 8082,
-  "documentation": null,
+  "documentation": "https://www.traccar.org/documentation/",
   "website": "https://www.traccar.org/",
-  "logo": "https://raw.githubusercontent.com/selfhst/icons/refs/heads/main/svg/traccar.svg",
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/webp/traccar.webp",
   "config_path": "/opt/traccar/conf/traccar.xml",
   "description": "Traccar is an open source GPS tracking system. It supports more than 200 GPS protocols and more than 2000 models of GPS tracking devices.",
   "install_methods": [
@@ -23,7 +23,7 @@
         "ram": 1024,
         "hdd": 2,
         "os": "debian",
-        "version": "12"
+        "version": "13"
       }
     }
   ],

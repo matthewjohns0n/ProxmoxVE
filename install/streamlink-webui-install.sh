@@ -16,9 +16,9 @@ update_os
 
 NODE_VERSION="22"
 NODE_MODULE="npm@latest,yarn@latest"
-install_node_and_modules
+setup_nodejs
 setup_uv
-fetch_and_deploy_gh_release "CrazyWolf13/streamlink-webui"
+fetch_and_deploy_gh_release "streamlink-webui" "CrazyWolf13/streamlink-webui"
 
 msg_info "Setup ${APPLICATION}"
 mkdir -p "/opt/${APPLICATION}-download"
@@ -61,6 +61,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

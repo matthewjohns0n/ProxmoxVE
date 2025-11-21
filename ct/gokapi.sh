@@ -20,15 +20,26 @@ color
 catch_errors
 
 function update_script() {
-   header_info
-   check_container_storage
-   check_container_resources
-   if [[ ! -d /opt/gokapi ]]; then
-      msg_error "No ${APP} Installation Found!"
-      exit
-   fi
-   msg_error "Currently we don't provide an update function for this ${APP}."
-   exit
+  header_info
+  check_container_storage
+  check_container_resources
+  if [[ ! -d /opt/gokapi ]]; then
+    msg_error "No ${APP} Installation Found!"
+    exit
+  fi
+  if check_for_gh_release "gokapi" "Forceu/Gokapi"; then
+    msg_info "Stopping Service"
+    systemctl stop gokapi
+    msg_ok "Stopped Service"
+
+    fetch_and_deploy_gh_release "gokapi" "Forceu/Gokapi" "prebuild" "latest" "/opt/gokapi" "gokapi-linux_amd64.zip"
+
+    msg_info "Starting Service"
+    systemctl start gokapi
+    msg_ok "Started Service"
+    msg_ok "Updated successfully!"
+  fi
+  exit
 }
 
 start

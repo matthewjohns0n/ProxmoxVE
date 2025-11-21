@@ -6,12 +6,12 @@
   ],
   "date_created": "2024-05-02",
   "type": "ct",
-  "updateable": false,
+  "updateable": true,
   "privileged": false,
   "interface_port": 8096,
   "documentation": "https://emby.media/support/articles/Home.html",
   "website": "https://emby.media/",
-  "logo": "https://raw.githubusercontent.com/selfhst/icons/refs/heads/main/svg/emby.svg",
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/webp/emby.webp",
   "config_path": "/var/lib/emby/config/system.xml",
   "description": "Emby brings together your personal videos, music, photos, and live television.",
   "install_methods": [
@@ -23,7 +23,7 @@
         "ram": 2048,
         "hdd": 8,
         "os": "ubuntu",
-        "version": "22.04"
+        "version": "24.04"
       }
     }
   ],

@@ -14,29 +14,30 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
-    git \
-    apache2 \
-    php8.2-{apcu,cli,common,curl,gd,imap,ldap,mysql,xmlrpc,xml,mbstring,bcmath,intl,zip,redis,bz2,soap} \
-    php-cas \
-    libapache2-mod-php \
-    mariadb-server
+$STD apt install -y \
+  git \
+  apache2 \
+  php8.4-{apcu,cli,common,curl,gd,ldap,mysql,xmlrpc,xml,mbstring,bcmath,intl,zip,redis,bz2,soap} \
+  php-cas \
+  libapache2-mod-php
 msg_ok "Installed Dependencies"
+
+setup_mariadb
 
 msg_info "Setting up database"
 DB_NAME=glpi_db
 DB_USER=glpi
 DB_PASS=$(openssl rand -base64 18 | tr -dc 'a-zA-Z0-9' | head -c13)
-mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql mysql
-mysql -u root -e "CREATE DATABASE $DB_NAME;"
-mysql -u root -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-mysql -u root -e "GRANT SELECT ON \`mysql\`.\`time_zone_name\` TO '$DB_USER'@'localhost'; FLUSH PRIVILEGES;"
+mariadb-tzinfo-to-sql /usr/share/zoneinfo | mariadb mysql
+$STD mariadb -u root -e "CREATE DATABASE $DB_NAME;"
+$STD mariadb -u root -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
+$STD mariadb -u root -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
+$STD mariadb -u root -e "GRANT SELECT ON \`mysql\`.\`time_zone_name\` TO '$DB_USER'@'localhost'; FLUSH PRIVILEGES;"
 {
-    echo "GLPI Database Credentials"
-    echo "Database: $DB_NAME"
-    echo "Username: $DB_USER"
-    echo "Password: $DB_PASS"
+  echo "GLPI Database Credentials"
+  echo "Database: $DB_NAME"
+  echo "Username: $DB_USER"
+  echo "Password: $DB_PASS"
 } >>~/glpi_db.creds
 msg_ok "Set up database"
 
@@ -46,7 +47,6 @@ RELEASE=$(curl -fsSL https://api.github.com/repos/glpi-project/glpi/releases/lat
 curl -fsSL "https://github.com/glpi-project/glpi/releases/download/${RELEASE}/glpi-${RELEASE}.tgz" -o $(basename "https://github.com/glpi-project/glpi/releases/download/${RELEASE}/glpi-${RELEASE}.tgz")
 $STD tar -xzvf glpi-${RELEASE}.tgz
 cd /opt/glpi
-$STD php bin/console db:install --db-name=$DB_NAME --db-user=$DB_USER --db-password=$DB_PASS --no-interaction
 echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
 msg_ok "Installed GLPi"
 
@@ -81,6 +81,18 @@ define('GLPI_CACHE_DIR', GLPI_VAR_DIR . '/_cache');
 define('GLPI_LOG_DIR', '/var/log/glpi');
 EOF
 msg_ok "Configured Downstream file"
+
+msg_info "Configuring GLPI Database"
+$STD /usr/bin/php /opt/glpi/bin/console db:install \
+  --db-host=localhost \
+  --db-name=$DB_NAME \
+  --db-user=$DB_USER \
+  --db-password=$DB_PASS \
+  --default-language=en_US \
+  --no-interaction \
+  --allow-superuser \
+  --force
+msg_ok "Configured GLPI Database"
 
 msg_info "Setting Folder and File Permissions"
 chown root:root /opt/glpi/ -R
@@ -144,6 +156,7 @@ customize
 msg_info "Cleaning up"
 rm -rf /opt/glpi/install
 rm -rf /opt/glpi-${RELEASE}.tgz
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

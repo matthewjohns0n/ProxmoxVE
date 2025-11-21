@@ -1,21 +1,24 @@
-import Footer from "@/components/Footer";
-import Navbar from "@/components/Navbar";
-import QueryProvider from "@/components/query-provider";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
-import { analytics, basePath } from "@/config/siteConfig";
-import "@/styles/globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { Inter } from "next/font/google";
+import Script from "next/script";
 import React from "react";
+
+import { ThemeProvider } from "@/components/theme-provider";
+import { analytics, basePath } from "@/config/site-config";
+import QueryProvider from "@/components/query-provider";
+import { Toaster } from "@/components/ui/sonner";
+import Footer from "@/components/footer";
+import Navbar from "@/components/navbar";
+import "@/styles/globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata : Metadata = {
+export const metadata: Metadata = {
   title: "Proxmox VE Helper-Scripts",
   description:
-    "The official website for the Proxmox VE Helper-Scripts (Community) Repository. Featuring over 300+ scripts to help you manage your Proxmox VE environment.",
+    "The official website for the Proxmox VE Helper-Scripts (Community) repository. Featuring over 400+ scripts to help you manage your Proxmox Virtual Environment.",
   applicationName: "Proxmox VE Helper-Scripts",
   generator: "Next.js",
   referrer: "origin-when-cross-origin",
@@ -55,7 +58,7 @@ export const metadata : Metadata = {
   openGraph: {
     title: "Proxmox VE Helper-Scripts",
     description:
-      "The official website for the Proxmox VE Helper-Scripts (Community) Repository. Featuring over 300+ scripts to help you manage your Proxmox VE environment.",
+      "The official website for the Proxmox VE Helper-Scripts (Community) repository. Featuring over 400+ scripts to help you manage your Proxmox Virtual Environment.",
     url: `https://community-scripts.github.io/${basePath}/`,
     siteName: "Proxmox VE Helper-Scripts",
     images: [
@@ -74,7 +77,7 @@ export const metadata : Metadata = {
     title: "Proxmox VE Helper-Scripts",
     creator: "@BramSuurdje",
     description:
-      "The official website for the Proxmox VE Helper-Scripts (Community) Repository. Featuring over 300+ scripts to help you manage your Proxmox VE environment.",
+      "The official website for the Proxmox VE Helper-Scripts (Community) repository. Featuring over 400+ scripts to help you manage your Proxmox Virtual Environment.",
     images: [`https://community-scripts.github.io/${basePath}/defaultimg.png`],
   },
   manifest: "/manifest.webmanifest",
@@ -93,26 +96,32 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script defer src={`https://${analytics.url}/script.js`} data-website-id={analytics.token}></script>
         <link rel="canonical" href={metadata.metadataBase?.href} />
         <link rel="manifest" href="manifest.webmanifest" />
         <link rel="preconnect" href="https://api.github.com" />
       </head>
       <body className={inter.className}>
+        <Script
+          src={`https://${analytics.url}/api/script.js`}
+          data-site-id={analytics.token}
+          strategy="afterInteractive"
+        />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <div className="flex w-full flex-col justify-center">
-            <Navbar />
-            <div className="flex min-h-screen flex-col justify-center">
-              <div className="flex w-full justify-center">
-                <div className="w-full max-w-7xl ">
-                  <QueryProvider>
-                    <NuqsAdapter>{children}</NuqsAdapter>
-                  </QueryProvider>
-                  <Toaster richColors />
+            <NuqsAdapter>
+              <QueryProvider>
+                <Navbar />
+                <div className="flex min-h-screen flex-col justify-center">
+                  <div className="flex w-full justify-center">
+                    <div className="w-full max-w-[1440px] ">
+                      {children}
+                      <Toaster richColors />
+                    </div>
+                  </div>
+                  <Footer />
                 </div>
-              </div>
-              <Footer />
-            </div>
+              </QueryProvider>
+            </NuqsAdapter>
           </div>
         </ThemeProvider>
       </body>

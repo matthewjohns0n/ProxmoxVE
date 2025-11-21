@@ -14,36 +14,18 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
+$STD apt install -y \
   jq \
-  ca-certificates \
-  gnupg
+  ca-certificates
 msg_ok "Installed Dependencies"
 
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
+NODE_VERSION="22" NODE_MODULE="playactor" setup_nodejs
+fetch_and_deploy_gh_release "ps5-mqtt" "FunkeyFlo/ps5-mqtt" "tarball"
 
-msg_info "Installing Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-$STD npm i -g playactor
-msg_ok "Installed Node.js"
-
-msg_info "Installing PS5-MQTT"
-RELEASE=$(curl -fsSL https://api.github.com/repos/FunkeyFlo/ps5-mqtt/releases/latest | jq -r '.tag_name')
-curl -fsSL https://github.com/FunkeyFlo/ps5-mqtt/archive/refs/tags/${RELEASE}.tar.gz -o /tmp/${RELEASE}.tar.gz
-tar zxf /tmp/${RELEASE}.tar.gz -C /opt
-mv /opt/ps5-mqtt-* /opt/ps5-mqtt
+msg_info "Configuring PS5-MQTT"
 cd /opt/ps5-mqtt/ps5-mqtt/
 $STD npm install
 $STD npm run build
-echo ${RELEASE} >/opt/ps5-mqtt_version.txt
-msg_ok "Installed PS5-MQTT"
-
-msg_info "Creating Service"
 mkdir -p /opt/.config/ps5-mqtt/
 mkdir -p /opt/.config/ps5-mqtt/playactor
 cat <<EOF >/opt/.config/ps5-mqtt/config.json
@@ -75,6 +57,9 @@ cat <<EOF >/opt/.config/ps5-mqtt/config.json
   "frontendPort": "8645"
 }
 EOF
+msg_ok "Configured PS5-MQTT"
+
+msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/ps5-mqtt.service
 [Unit]
 Description=PS5-MQTT Daemon
@@ -101,7 +86,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
-rm /tmp/${RELEASE}.tar.gz
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

@@ -17,7 +17,7 @@ msg_info "Install Matterbridge"
 mkdir -p /root/Matterbridge
 NODE_VERSION="22"
 NODE_MODULE="matterbridge"
-install_node_and_modules
+setup_nodejs
 msg_ok "Installed Matterbridge"
 
 msg_info "Creating Service"
@@ -46,6 +46,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

@@ -13,17 +13,10 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Silverbullet"
-RELEASE=$(curl -fsSL https://api.github.com/repos/silverbulletmd/silverbullet/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-mkdir -p /opt/silverbullet/bin /opt/silverbullet/space
-curl -fsSL "https://github.com/silverbulletmd/silverbullet/releases/download/${RELEASE}/silverbullet-server-linux-x86_64.zip" -o $(basename "https://github.com/silverbulletmd/silverbullet/releases/download/${RELEASE}/silverbullet-server-linux-x86_64.zip")
-unzip -oq -d /opt/silverbullet/bin/ silverbullet-server-linux-x86_64.zip
-chmod +x /opt/silverbullet/bin/silverbullet
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
-msg_ok "Installed Silverbullet"
+fetch_and_deploy_gh_release "silverbullet" "silverbulletmd/silverbullet" "prebuild" "latest" "/opt/silverbullet/bin" "silverbullet-server-linux-x86_64.zip"
+mkdir -p /opt/silverbullet/space
 
 msg_info "Creating Service"
-
 cat <<EOF >/etc/systemd/system/silverbullet.service
 [Unit]
 Description=Silverbullet Daemon
@@ -46,7 +39,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -rf silverbullet-server-linux-x86_64.zip
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

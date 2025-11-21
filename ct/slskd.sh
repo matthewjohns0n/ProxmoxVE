@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-512}"
 var_disk="${var_disk:-4}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -31,20 +31,20 @@ function update_script() {
 
   RELEASE=$(curl -s https://api.github.com/repos/slskd/slskd/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
   if [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]] || [[ ! -f /opt/${APP}_version.txt ]]; then
-    msg_info "Stopping $APP"
+    msg_info "Stopping Service"
     systemctl stop slskd soularr.timer soularr.service
-    msg_ok "Stopped $APP"
+    msg_info "Stopped Service"
 
     msg_info "Updating $APP to v${RELEASE}"
     tmp_file=$(mktemp)
     curl -fsSL "https://github.com/slskd/slskd/releases/download/${RELEASE}/slskd-${RELEASE}-linux-x64.zip" -o $tmp_file
-    unzip -q -oj $tmp_file slskd -d /opt/${APP}
+    $STD unzip -oj $tmp_file slskd -d /opt/${APP}
     echo "${RELEASE}" >/opt/${APP}_version.txt
     msg_ok "Updated $APP to v${RELEASE}"
 
-    msg_info "Starting $APP"
+    msg_info "Starting Service"
     systemctl start slskd
-    msg_ok "Started $APP"
+    msg_ok "Started Service"
     rm -rf $tmp_file
   else
     msg_ok "No ${APP} update required. ${APP} is already at v${RELEASE}"
@@ -55,7 +55,7 @@ function update_script() {
   cd /tmp
   rm -rf /opt/soularr
   curl -fsSL -o main.zip https://github.com/mrusse/soularr/archive/refs/heads/main.zip
-  unzip -q main.zip
+  $STD unzip main.zip
   mv soularr-main /opt/soularr
   cd /opt/soularr
   $STD pip install -r requirements.txt

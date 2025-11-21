@@ -14,32 +14,15 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
-  gnupg \
-  xdg-utils
+$STD apt-get install -y xdg-utils
 msg_ok "Installed Dependencies"
 
-msg_info "Setup Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Setup Node.js Repository"
+NODE_VERSION="22" NODE_MODULE="yarn@latest" setup_nodejs
+fetch_and_deploy_gh_release "excalidraw" "excalidraw/excalidraw"
 
-msg_info "Setup Node.js"
-$STD apt-get update
-$STD apt-get install -y nodejs
-$STD npm install -g yarn
-msg_ok "Setup Node.js"
-
-msg_info "Setup Excalidraw"
-temp_file=$(mktemp)
-RELEASE=$(curl -fsSL https://api.github.com/repos/excalidraw/excalidraw/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-curl -fsSL "https://github.com/excalidraw/excalidraw/archive/refs/tags/v${RELEASE}.tar.gz" -o "$temp_file"
-tar xzf $temp_file
-mv excalidraw-${RELEASE} /opt/excalidraw
+msg_info "Configuring Excalidraw"
 cd /opt/excalidraw
 $STD yarn
-echo "${RELEASE}" >/opt/excalidraw_version.txt
 msg_ok "Setup Excalidraw"
 
 msg_info "Creating Service"
@@ -64,7 +47,6 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -f $temp_file
 $STD apt-get -y autoremove
 $STD apt-get -y autoclean
 msg_ok "Cleaned"

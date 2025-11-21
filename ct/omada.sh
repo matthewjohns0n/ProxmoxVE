@@ -29,28 +29,14 @@ function update_script() {
   fi
 
   msg_info "Updating MongoDB"
-  MONGODB_VERSION="7.0"
-  if ! lscpu | grep -q 'avx'; then
-    MONGODB_VERSION="4.4"
-    msg_error "No AVX detected: TP-Link Canceled Support for Old MongoDB for Debian 12\n https://www.tp-link.com/baltic/support/faq/4160/"
-    exit 1
-  fi
-
-  curl -fsSL "https://www.mongodb.org/static/pgp/server-${MONGODB_VERSION}.asc" | gpg --dearmor >/usr/share/keyrings/mongodb-server-${MONGODB_VERSION}.gpg
-  echo "deb [signed-by=/usr/share/keyrings/mongodb-server-${MONGODB_VERSION}.gpg] http://repo.mongodb.org/apt/debian $(grep '^VERSION_CODENAME=' /etc/os-release | cut -d'=' -f2)/mongodb-org/${MONGODB_VERSION} main" >/etc/apt/sources.list.d/mongodb-org-${MONGODB_VERSION}.list
-  $STD apt-get update
-  $STD apt-get install -y --only-upgrade mongodb-org
-  msg_ok "Updated MongoDB to $MONGODB_VERSION"
-
-  msg_info "Checking if right Azul Zulu Java is installed"
-  java_version=$(java -version 2>&1 | awk -F[\"_] '/version/ {print $2}')
-  if [[ "$java_version" =~ ^1\.8\.* ]]; then
-    $STD apt-get remove --purge -y zulu8-jdk
-    $STD apt-get -y install zulu21-jre-headless
-    msg_ok "Updated Azul Zulu Java to 21"
+  if lscpu | grep -q 'avx'; then
+    MONGO_VERSION="8.0" setup_mongodb
   else
-    msg_ok "Azul Zulu Java 21 already installed"
+    msg_error "No AVX detected (CPU-Flag)! We have discontinued support for this. You are welcome to try it manually with a Debian LXC, but due to the many issues with Omada, we currently only support AVX CPUs."
+    exit 10
   fi
+
+  JAVA_VERSION="21" setup_java
 
   msg_info "Updating Omada Controller"
   OMADA_URL=$(curl -fsSL "https://support.omadanetworks.com/en/download/software/omada-controller/" |
@@ -59,13 +45,14 @@ function update_script() {
   OMADA_PKG=$(basename "$OMADA_URL")
   if [ -z "$OMADA_PKG" ]; then
     msg_error "Could not retrieve Omada package – server may be down."
-    exit 1
+    exit
   fi
   curl -fsSL "$OMADA_URL" -o "$OMADA_PKG"
   export DEBIAN_FRONTEND=noninteractive
   $STD dpkg -i "$OMADA_PKG"
   rm -f "$OMADA_PKG"
-  msg_ok "Updated Omada Controller"
+  msg_ok "Updated successfully!"
+  exit
 }
 
 start

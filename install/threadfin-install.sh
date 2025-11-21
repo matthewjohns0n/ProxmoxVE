@@ -14,16 +14,14 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y ffmpeg
-$STD apt-get install -y vlc
+$STD apt install -y \
+  ffmpeg \
+  vlc
 msg_ok "Installed Dependencies"
 
-msg_info "Installing Threadfin"
-mkdir -p /opt/threadfin
-curl -fsSL "https://github.com/Threadfin/Threadfin/releases/latest/download/Threadfin_linux_amd64" -o "/opt/threadfin/threadfin"
-chmod +x /opt/threadfin/threadfin
-
-msg_ok "Installed Threadfin"
+fetch_and_deploy_gh_release "threadfin" "threadfin/threadfin" "singlefile" "latest" "/opt/threadfin" "Threadfin_linux_amd64"
+mv /root/.threadfin /root/.threadfin_version
+mkdir -p /root/.threadfin
 
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/threadfin.service
@@ -47,6 +45,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

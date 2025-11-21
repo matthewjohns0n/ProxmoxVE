@@ -23,15 +23,15 @@ function update_script() {
   header_info
   check_container_storage
   check_container_resources
+
   if [[ ! -d /opt/commafeed ]]; then
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -fsSL https://api.github.com/repos/Athou/commafeed/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
-  if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
-    msg_info "Stopping ${APP}"
+  if check_for_gh_release "commafeed" "Athou/commafeed"; then
+    msg_info "Stopping Service"
     systemctl stop commafeed
-    msg_ok "Stopped ${APP}"
+    msg_ok "Stopped Service"
 
     if ! [[ $(dpkg -s rsync 2>/dev/null) ]]; then
       msg_info "Installing Dependencies"
@@ -40,20 +40,24 @@ function update_script() {
       msg_ok "Installed Dependencies"
     fi
 
-    msg_info "Updating ${APP} to ${RELEASE}"
-    curl -fsSL "https://github.com/Athou/commafeed/releases/download/${RELEASE}/commafeed-${RELEASE}-h2-jvm.zip" -o $(basename "https://github.com/Athou/commafeed/releases/download/${RELEASE}/commafeed-${RELEASE}-h2-jvm.zip")
-    unzip -q commafeed-"${RELEASE}"-h2-jvm.zip
-    rsync -a --exclude 'data/' commafeed-"${RELEASE}"-h2/ /opt/commafeed/
-    rm -rf commafeed-"${RELEASE}"-h2 commafeed-"${RELEASE}"-h2-jvm.zip
-    echo "${RELEASE}" >/opt/${APP}_version.txt
-    msg_ok "Updated ${APP} to ${RELEASE}"
+    if [ -d /opt/commafeed/data ] && [ "$(ls -A /opt/commafeed/data)" ]; then
+      msg_info "Backing up existing data"
+      mv /opt/commafeed/data /opt/data.bak
+      msg_ok "Backed up existing data"
+    fi
 
-    msg_info "Starting ${APP}"
+    fetch_and_deploy_gh_release "commafeed" "Athou/commafeed" "prebuild" "latest" "/opt/commafeed" "commafeed-*-h2-jvm.zip"
+
+    if [ -d /opt/data.bak ] && [ "$(ls -A /opt/data.bak)" ]; then
+      msg_info "Restoring data"
+      mv /opt/data.bak /opt/commafeed/data
+      msg_ok "Restored data"
+    fi
+
+    msg_info "Starting Service"
     systemctl start commafeed
-    msg_ok "Started ${APP}"
-    msg_ok "Updated Successfully"
-  else
-    msg_ok "No update required. ${APP} is already at ${RELEASE}"
+    msg_ok "Started Service"
+    msg_ok "Updated successfully!"
   fi
   exit
 }
