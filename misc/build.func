@@ -1158,8 +1158,101 @@ build_container() {
     -unprivileged $CT_TYPE
     $PW
   "
+  # Debug: Show what will be passed to create_lxc.sh
+  echo -e "\n${YW}=== DEBUG: Container Creation Parameters ===${CL}"
+  echo -e "CTID: ${BL}$CTID${CL}"
+  echo -e "PCT_OSTYPE: ${BL}$PCT_OSTYPE${CL}"
+  echo -e "PCT_OSVERSION: ${BL}$PCT_OSVERSION${CL}"
+  echo -e "PCT_DISK_SIZE: ${BL}$PCT_DISK_SIZE${CL}"
+  echo -e "PCT_OPTIONS: ${BL}${PCT_OPTIONS}${CL}"
+  echo -e "${YW}==============================================${CL}\n"
+
   # This executes create_lxc.sh and creates the container and .conf file
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/create_lxc.sh)" $?
+  # Capture output for debugging
+  CREATE_LXC_OUTPUT=$(bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/create_lxc.sh)" 2>&1)
+  CREATE_LXC_EXIT=$?
+
+  # Display the output
+  echo -e "\n${YW}=== DEBUG: create_lxc.sh Output ===${CL}"
+  echo "$CREATE_LXC_OUTPUT"
+  echo -e "${YW}====================================${CL}\n"
+
+  # If it failed, show additional debugging
+  if [ $CREATE_LXC_EXIT -ne 0 ]; then
+    echo -e "\n${RD}=== DEBUG: Additional Diagnostics ===${CL}"
+    echo -e "Exit code: ${RD}$CREATE_LXC_EXIT${CL}"
+    echo -e "\nChecking if container was partially created..."
+    if pct list | grep -q "^$CTID"; then
+      echo -e "${YW}⚠️  Container $CTID exists but creation reported failure${CL}"
+      pct config $CTID
+    else
+      echo -e "${GN}✓ Container $CTID does not exist${CL}"
+    fi
+
+    echo -e "\nChecking storage..."
+    pvesm status | grep -E "(Samsung500|local)"
+
+    echo -e "\nChecking template..."
+    TEMPLATE_CHECK=$(pveam list local | grep -E "debian-13.*standard" | tail -1)
+    TEMPLATE_NAME=""
+    if [ -n "$TEMPLATE_CHECK" ]; then
+      TEMPLATE_NAME=$(echo $TEMPLATE_CHECK | awk '{print $1}')
+      echo -e "Template found: ${GN}$TEMPLATE_CHECK${CL}"
+      TEMPLATE_PATH=$(pvesm path local:vztmpl/$TEMPLATE_NAME 2>/dev/null || echo "/var/lib/vz/template/cache/$TEMPLATE_NAME")
+      if [ -f "$TEMPLATE_PATH" ]; then
+        TEMPLATE_SIZE=$(du -h "$TEMPLATE_PATH" | cut -f1)
+        TEMPLATE_BYTES=$(stat -c%s "$TEMPLATE_PATH" 2>/dev/null || echo "unknown")
+        echo -e "Template path: ${BL}$TEMPLATE_PATH${CL}"
+        echo -e "Template size: ${BL}$TEMPLATE_SIZE${CL} ($TEMPLATE_BYTES bytes)"
+        # Verify template integrity
+        if zstdcat "$TEMPLATE_PATH" | tar -tf - >/dev/null 2>&1; then
+          echo -e "Template integrity: ${GN}✓ Valid${CL}"
+        else
+          echo -e "Template integrity: ${RD}✗ Corrupted${CL}"
+        fi
+      else
+        echo -e "${RD}Template file not found at: $TEMPLATE_PATH${CL}"
+      fi
+    else
+      echo -e "${RD}No debian-13 template found in local storage${CL}"
+      echo -e "Available templates:"
+      pveam list local | grep debian | tail -5
+    fi
+
+    # Only try manual creation if container doesn't exist
+    if ! pct list | grep -q "^$CTID"; then
+      if [ -n "$TEMPLATE_NAME" ]; then
+        echo -e "\nAttempting manual pct create to see actual error..."
+        echo -e "${YW}Running: pct create $CTID local:vztmpl/$TEMPLATE_NAME -rootfs Samsung500:$PCT_DISK_SIZE -features nesting=1 -hostname $HN -onboot 1 -cores $CORE_COUNT -memory $RAM_SIZE -unprivileged $CT_TYPE${CL}\n"
+
+        # Try manual creation to see the actual error
+        MANUAL_OUTPUT=$(pct create $CTID local:vztmpl/$TEMPLATE_NAME \
+          -rootfs Samsung500:$PCT_DISK_SIZE \
+          -features nesting=1 \
+          -hostname $HN \
+          -onboot 1 \
+          -cores $CORE_COUNT \
+          -memory $RAM_SIZE \
+          -unprivileged $CT_TYPE \
+          -net0 name=eth0,bridge=vmbr0,ip=dhcp 2>&1)
+        MANUAL_EXIT=$?
+
+        echo -e "${RD}Manual pct create output:${CL}"
+        echo "$MANUAL_OUTPUT"
+        echo -e "\nManual pct create exit code: ${RD}$MANUAL_EXIT${CL}"
+      else
+        echo -e "\n${YW}Cannot test manual creation - template name not found${CL}"
+      fi
+    else
+      echo -e "\n${YW}Container $CTID already exists - skipping manual creation test${CL}"
+    fi
+    echo -e "${RD}====================================${CL}\n"
+  fi
+
+  # Exit with the same code as create_lxc.sh
+  if [ $CREATE_LXC_EXIT -ne 0 ]; then
+    exit $CREATE_LXC_EXIT
+  fi
 
   LXC_CONFIG="/etc/pve/lxc/${CTID}.conf"
 
