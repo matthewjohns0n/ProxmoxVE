@@ -333,7 +333,11 @@ flock -w 60 9 || {
   exit 211
 }
 
-if ! pct create "$CTID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" "${PCT_OPTIONS[@]}" &>/dev/null; then
+PCT_ERROR_OUTPUT=$(pct create "$CTID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" "${PCT_OPTIONS[@]}" 2>&1)
+PCT_EXIT_CODE=$?
+if [ $PCT_EXIT_CODE -ne 0 ]; then
+  echo -e "${RD}Actual error from pct create:${CL}"
+  echo -e "${RD}$PCT_ERROR_OUTPUT${CL}"
   msg_error "Container creation failed. Checking if template is corrupted or incomplete."
 
   if [[ ! -s "$TEMPLATE_PATH" || "$(stat -c%s "$TEMPLATE_PATH")" -lt 1000000 ]]; then
