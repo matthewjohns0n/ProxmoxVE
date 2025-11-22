@@ -1208,49 +1208,73 @@ build_container() {
 
     echo "DEBUG: Determined template storage: ${TEMPLATE_STORAGE:-not found}" >&2
     echo "DEBUG: Determined container storage: ${CONTAINER_STORAGE:-not found}" >&2
-
+    
     # Export STORAGE for container storage (create_lxc.sh checks this for rootdir)
     export STORAGE="$CONTAINER_STORAGE"
-
-    # Save script to temp file and patch it
-    TEMP_SCRIPT=$(mktemp)
-    echo "$CREATE_LXC_SCRIPT" > "$TEMP_SCRIPT"
-
+    
     # Get storage info
     TEMPLATE_INFO=$(pvesm status 2>/dev/null | awk -v s="$TEMPLATE_STORAGE" '$1 == s {free=$6/1024/1024; used=$5/1024/1024; printf "Free: %.1fGB  Used: %.1fGB", free, used}')
     CONTAINER_INFO=$(pvesm status 2>/dev/null | awk -v s="$CONTAINER_STORAGE" '$1 == s {free=$6/1024/1024; used=$5/1024/1024; printf "Free: %.1fGB  Used: %.1fGB", free, used}')
+    
+    # Use Python for reliable multi-line replacement
+    echo "DEBUG: Patching script with Python" >&2
+    if ! command -v python3 >/dev/null 2>&1; then
+      echo "DEBUG: Python3 not found, using original script with STORAGE export only" >&2
+      PATCHED_SCRIPT="$CREATE_LXC_SCRIPT"
+    else
+      # Write script to temp file for Python to read
+      TEMP_INPUT=$(mktemp)
+      echo "$CREATE_LXC_SCRIPT" > "$TEMP_INPUT"
+      
+      PATCHED_SCRIPT=$(python3 <<PYTHON_SCRIPT 2>&1
+import sys
+import re
 
-    # Replace the while loops that call select_storage with direct assignments
-    # For template storage
-    sed -i "/^while true; do$/,/^done$/{
-      /select_storage template/{
-        i\
-    TEMPLATE_STORAGE=\"$TEMPLATE_STORAGE\"\
-    TEMPLATE_STORAGE_INFO=\"$TEMPLATE_INFO\"\
-    msg_ok \"Storage \${BL}$TEMPLATE_STORAGE\${CL} ($TEMPLATE_INFO) [Template]\"\
-    break
-        d
-      }
-      /select_storage template/,/^done$/d
-    }" "$TEMP_SCRIPT"
+template_storage = '$TEMPLATE_STORAGE'
+template_info = '$TEMPLATE_INFO'
+container_storage = '$CONTAINER_STORAGE'
+container_info = '$CONTAINER_INFO'
 
-    # For container storage
-    sed -i "/^while true; do$/,/^done$/{
-      /select_storage container/{
-        i\
-    CONTAINER_STORAGE=\"$CONTAINER_STORAGE\"\
-    CONTAINER_STORAGE_INFO=\"$CONTAINER_INFO\"\
-    msg_ok \"Storage \${BL}$CONTAINER_STORAGE\${CL} ($CONTAINER_INFO) [Container]\"\
-    break
-        d
-      }
-      /select_storage container/,/^done$/d
-    }" "$TEMP_SCRIPT"
+with open('$TEMP_INPUT', 'r') as f:
+    script = f.read()
 
+# Replace template storage selection - match the while loop pattern
+pattern1 = r'(while true; do\s+if select_storage template; then.*?done)'
+replacement1 = f'''while true; do
+  TEMPLATE_STORAGE="{template_storage}"
+  TEMPLATE_STORAGE_INFO="{template_info}"
+  msg_ok "Storage ${{BL}}{template_storage}${{CL}} ({template_info}) [Template]"
+  break
+done'''
+script = re.sub(pattern1, replacement1, script, flags=re.DOTALL)
+
+# Replace container storage selection
+pattern2 = r'(while true; do\s+if select_storage container; then.*?done)'
+replacement2 = f'''while true; do
+  CONTAINER_STORAGE="{container_storage}"
+  CONTAINER_STORAGE_INFO="{container_info}"
+  msg_ok "Storage ${{BL}}{container_storage}${{CL}} ({container_info}) [Container]"
+  break
+done'''
+script = re.sub(pattern2, replacement2, script, flags=re.DOTALL)
+
+print(script)
+PYTHON_SCRIPT
+)
+      PYTHON_EXIT=$?
+      rm -f "$TEMP_INPUT"
+      
+      if [ $PYTHON_EXIT -ne 0 ] || [ -z "$PATCHED_SCRIPT" ] || [ ${#PATCHED_SCRIPT} -lt 1000 ]; then
+        echo "DEBUG: Python patching failed (exit: $PYTHON_EXIT, length: ${#PATCHED_SCRIPT}), using original script" >&2
+        PATCHED_SCRIPT="$CREATE_LXC_SCRIPT"
+      else
+        echo "DEBUG: Python patching successful, script length: ${#PATCHED_SCRIPT}" >&2
+      fi
+    fi
+    
     echo "DEBUG: Executing patched create_lxc.sh" >&2
-    CREATE_LXC_OUTPUT=$(bash "$TEMP_SCRIPT" 2>&1)
+    CREATE_LXC_OUTPUT=$(bash -c "$PATCHED_SCRIPT" 2>&1)
     CREATE_LXC_EXIT=$?
-    rm -f "$TEMP_SCRIPT"
   fi
 
   # Re-enable error handling
