@@ -1172,9 +1172,21 @@ build_container() {
   set +e
   trap - ERR
 
-  # Capture output for debugging
-  CREATE_LXC_OUTPUT=$(bash -c "$(curl -fsSL https://raw.githubusercontent.com/matthewjohns0n/ProxmoxVE/main/misc/create_lxc.sh)" 2>&1)
-  CREATE_LXC_EXIT=$?
+  # Capture output for debugging with timeout
+  # Use upstream create_lxc.sh for now (it handles storage selection better)
+  echo -e "${YW}Downloading and executing create_lxc.sh...${CL}"
+  CREATE_LXC_SCRIPT=$(timeout 30 curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/create_lxc.sh 2>&1)
+  CURL_EXIT=$?
+
+  if [ $CURL_EXIT -ne 0 ] || [ -z "$CREATE_LXC_SCRIPT" ]; then
+    echo -e "${RD}Failed to download create_lxc.sh (exit code: $CURL_EXIT)${CL}"
+    CREATE_LXC_OUTPUT="Error: Could not download create_lxc.sh script. Curl output: $CREATE_LXC_SCRIPT"
+    CREATE_LXC_EXIT=1
+  else
+    echo -e "${GN}Downloaded create_lxc.sh${CL}"
+    CREATE_LXC_OUTPUT=$(bash -c "$CREATE_LXC_SCRIPT" 2>&1)
+    CREATE_LXC_EXIT=$?
+  fi
 
   # Re-enable error handling
   set -e
