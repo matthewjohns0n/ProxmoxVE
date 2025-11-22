@@ -1200,8 +1200,57 @@ build_container() {
     CREATE_LXC_EXIT=1
   else
     echo -e "${GN}Downloaded create_lxc.sh${CL}"
-    CREATE_LXC_OUTPUT=$(bash -c "$CREATE_LXC_SCRIPT" 2>&1)
+
+    # Determine storages to avoid whiptail prompts
+    # Prefer "local" for templates, "Samsung500" for containers if available
+    TEMPLATE_STORAGE=$(pvesm status -content vztmpl 2>/dev/null | awk 'NR>1 {if ($1 == "local") {print $1; exit} else if (!found) {found=$1}} END {if (found) print found}')
+    CONTAINER_STORAGE=$(pvesm status -content rootdir 2>/dev/null | awk 'NR>1 {if ($1 == "Samsung500") {print $1; exit} else if (!found) {found=$1}} END {if (found) print found}')
+
+    echo "DEBUG: Determined template storage: ${TEMPLATE_STORAGE:-not found}" >&2
+    echo "DEBUG: Determined container storage: ${CONTAINER_STORAGE:-not found}" >&2
+
+    # Export STORAGE for container storage (create_lxc.sh checks this for rootdir)
+    export STORAGE="$CONTAINER_STORAGE"
+
+    # Save script to temp file and patch it
+    TEMP_SCRIPT=$(mktemp)
+    echo "$CREATE_LXC_SCRIPT" > "$TEMP_SCRIPT"
+
+    # Get storage info
+    TEMPLATE_INFO=$(pvesm status 2>/dev/null | awk -v s="$TEMPLATE_STORAGE" '$1 == s {free=$6/1024/1024; used=$5/1024/1024; printf "Free: %.1fGB  Used: %.1fGB", free, used}')
+    CONTAINER_INFO=$(pvesm status 2>/dev/null | awk -v s="$CONTAINER_STORAGE" '$1 == s {free=$6/1024/1024; used=$5/1024/1024; printf "Free: %.1fGB  Used: %.1fGB", free, used}')
+
+    # Replace the while loops that call select_storage with direct assignments
+    # For template storage
+    sed -i "/^while true; do$/,/^done$/{
+      /select_storage template/{
+        i\
+    TEMPLATE_STORAGE=\"$TEMPLATE_STORAGE\"\
+    TEMPLATE_STORAGE_INFO=\"$TEMPLATE_INFO\"\
+    msg_ok \"Storage \${BL}$TEMPLATE_STORAGE\${CL} ($TEMPLATE_INFO) [Template]\"\
+    break
+        d
+      }
+      /select_storage template/,/^done$/d
+    }" "$TEMP_SCRIPT"
+
+    # For container storage
+    sed -i "/^while true; do$/,/^done$/{
+      /select_storage container/{
+        i\
+    CONTAINER_STORAGE=\"$CONTAINER_STORAGE\"\
+    CONTAINER_STORAGE_INFO=\"$CONTAINER_INFO\"\
+    msg_ok \"Storage \${BL}$CONTAINER_STORAGE\${CL} ($CONTAINER_INFO) [Container]\"\
+    break
+        d
+      }
+      /select_storage container/,/^done$/d
+    }" "$TEMP_SCRIPT"
+
+    echo "DEBUG: Executing patched create_lxc.sh" >&2
+    CREATE_LXC_OUTPUT=$(bash "$TEMP_SCRIPT" 2>&1)
     CREATE_LXC_EXIT=$?
+    rm -f "$TEMP_SCRIPT"
   fi
 
   # Re-enable error handling
