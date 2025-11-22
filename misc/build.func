@@ -1174,9 +1174,25 @@ build_container() {
 
   # Capture output for debugging with timeout
   # Use upstream create_lxc.sh for now (it handles storage selection better)
-  echo -e "${YW}Downloading and executing create_lxc.sh...${CL}"
-  CREATE_LXC_SCRIPT=$(timeout 30 curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/create_lxc.sh 2>&1)
-  CURL_EXIT=$?
+  echo -e "\n${YW}Downloading and executing create_lxc.sh...${CL}" >&2
+  echo "DEBUG: About to download create_lxc.sh" >&2
+
+  # Check if timeout command exists, if not use curl directly
+  if command -v timeout >/dev/null 2>&1; then
+    echo "DEBUG: Using timeout command" >&2
+    CREATE_LXC_SCRIPT=$(timeout 30 curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/create_lxc.sh 2>&1)
+    CURL_EXIT=$?
+  else
+    echo "DEBUG: Timeout not available, using curl with --max-time" >&2
+    CREATE_LXC_SCRIPT=$(curl -fsSL --max-time 30 https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/create_lxc.sh 2>&1)
+    CURL_EXIT=$?
+  fi
+
+  echo "DEBUG: Curl completed, exit code: $CURL_EXIT, script length: ${#CREATE_LXC_SCRIPT}" >&2
+
+  if [ $CURL_EXIT -ne 0 ]; then
+    echo "DEBUG: Curl failed, output: $CREATE_LXC_SCRIPT" >&2
+  fi
 
   if [ $CURL_EXIT -ne 0 ] || [ -z "$CREATE_LXC_SCRIPT" ]; then
     echo -e "${RD}Failed to download create_lxc.sh (exit code: $CURL_EXIT)${CL}"
