@@ -1208,14 +1208,14 @@ build_container() {
 
     echo "DEBUG: Determined template storage: ${TEMPLATE_STORAGE:-not found}" >&2
     echo "DEBUG: Determined container storage: ${CONTAINER_STORAGE:-not found}" >&2
-    
+
     # Export STORAGE for container storage (create_lxc.sh checks this for rootdir)
     export STORAGE="$CONTAINER_STORAGE"
-    
+
     # Get storage info
     TEMPLATE_INFO=$(pvesm status 2>/dev/null | awk -v s="$TEMPLATE_STORAGE" '$1 == s {free=$6/1024/1024; used=$5/1024/1024; printf "Free: %.1fGB  Used: %.1fGB", free, used}')
     CONTAINER_INFO=$(pvesm status 2>/dev/null | awk -v s="$CONTAINER_STORAGE" '$1 == s {free=$6/1024/1024; used=$5/1024/1024; printf "Free: %.1fGB  Used: %.1fGB", free, used}')
-    
+
     # Use Python for reliable multi-line replacement
     echo "DEBUG: Patching script with Python" >&2
     if ! command -v python3 >/dev/null 2>&1; then
@@ -1258,12 +1258,35 @@ replacement2 = f'''while true; do
 done'''
 script = re.sub(pattern2, replacement2, script, flags=re.DOTALL)
 
+# Fix: Filter out Debian 13.1 templates for Proxmox 9.0 compatibility
+# Modify template selection to exclude 13.1 versions
+script = re.sub(
+    r"(mapfile -t TEMPLATES < <\([^)]+pveam list \"\\\$TEMPLATE_STORAGE\"[^)]+\))",
+    r'''mapfile -t TEMPLATES < <(
+  pveam list "$TEMPLATE_STORAGE" |
+    awk -v s="$TEMPLATE_SEARCH" -v p="$TEMPLATE_PATTERN" '$1 ~ s && $1 ~ p {print $1}' |
+    sed 's/.*\\///' | grep -v "13\\.1" | sort -t - -k 2 -V
+)''',
+    script
+)
+# Also filter online templates
+script = re.sub(
+    r"(mapfile -t TEMPLATES < <\([^)]+pveam available -section system[^)]+\))",
+    r'''mapfile -t TEMPLATES < <(
+  pveam update >/dev/null 2>&1 &&
+    pveam available -section system |
+    sed -n "s/.*\\($TEMPLATE_SEARCH.*$TEMPLATE_PATTERN.*\\)/\\1/p" |
+    grep -v "13\\.1" | sort -t - -k 2 -V
+)''',
+    script
+)
+
 print(script)
 PYTHON_SCRIPT
 )
       PYTHON_EXIT=$?
       rm -f "$TEMP_INPUT"
-      
+
       if [ $PYTHON_EXIT -ne 0 ] || [ -z "$PATCHED_SCRIPT" ] || [ ${#PATCHED_SCRIPT} -lt 1000 ]; then
         echo "DEBUG: Python patching failed (exit: $PYTHON_EXIT, length: ${#PATCHED_SCRIPT}), using original script" >&2
         PATCHED_SCRIPT="$CREATE_LXC_SCRIPT"
@@ -1271,7 +1294,7 @@ PYTHON_SCRIPT
         echo "DEBUG: Python patching successful, script length: ${#PATCHED_SCRIPT}" >&2
       fi
     fi
-    
+
     echo "DEBUG: Executing patched create_lxc.sh" >&2
     CREATE_LXC_OUTPUT=$(bash -c "$PATCHED_SCRIPT" 2>&1)
     CREATE_LXC_EXIT=$?
