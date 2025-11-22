@@ -1225,17 +1225,21 @@ build_container() {
       # Write script to temp file for Python to read
       TEMP_INPUT=$(mktemp)
       echo "$CREATE_LXC_SCRIPT" > "$TEMP_INPUT"
-      
-      PATCHED_SCRIPT=$(python3 <<PYTHON_SCRIPT 2>&1
+
+      # Write complete Python script to temp file to avoid heredoc expansion issues
+      TEMP_PYTHON=$(mktemp)
+      cat > "$TEMP_PYTHON" <<'PYTHON_EOF'
 import sys
 import re
+import os
 
-template_storage = '$TEMPLATE_STORAGE'
-template_info = '$TEMPLATE_INFO'
-container_storage = '$CONTAINER_STORAGE'
-container_info = '$CONTAINER_INFO'
+template_storage = os.environ.get('TEMPLATE_STORAGE_VAR', '')
+template_info = os.environ.get('TEMPLATE_INFO_VAR', '')
+container_storage = os.environ.get('CONTAINER_STORAGE_VAR', '')
+container_info = os.environ.get('CONTAINER_INFO_VAR', '')
 
-with open('$TEMP_INPUT', 'r') as f:
+script_file = os.environ.get('TEMP_INPUT_VAR', '')
+with open(script_file, 'r') as f:
     script = f.read()
 
 # Replace template storage selection - match the while loop pattern
@@ -1282,14 +1286,31 @@ script = re.sub(
 )
 
 print(script)
-PYTHON_SCRIPT
-)
+PYTHON_EOF
+
+      # Export variables for Python
+      export TEMPLATE_STORAGE_VAR="$TEMPLATE_STORAGE"
+      export TEMPLATE_INFO_VAR="$TEMPLATE_INFO"
+      export CONTAINER_STORAGE_VAR="$CONTAINER_STORAGE"
+      export CONTAINER_INFO_VAR="$CONTAINER_INFO"
+      export TEMP_INPUT_VAR="$TEMP_INPUT"
+
+      PATCHED_SCRIPT=$(python3 "$TEMP_PYTHON" 2>&1)
       PYTHON_EXIT=$?
-      rm -f "$TEMP_INPUT"
+      rm -f "$TEMP_INPUT" "$TEMP_PYTHON"
 
       if [ $PYTHON_EXIT -ne 0 ] || [ -z "$PATCHED_SCRIPT" ] || [ ${#PATCHED_SCRIPT} -lt 1000 ]; then
-        echo "DEBUG: Python patching failed (exit: $PYTHON_EXIT, length: ${#PATCHED_SCRIPT}), using original script" >&2
-        PATCHED_SCRIPT="$CREATE_LXC_SCRIPT"
+        echo "DEBUG: Python patching failed (exit: $PYTHON_EXIT, length: ${#PATCHED_SCRIPT}), applying fallback filter" >&2
+        if [ -n "$PATCHED_SCRIPT" ]; then
+          echo "DEBUG: Python error output: $PATCHED_SCRIPT" >&2
+        fi
+        # Fallback: Use sed to filter out 13.1 templates from template lists
+        # This is more reliable than Python regex for this simple case
+        PATCHED_SCRIPT=$(echo "$CREATE_LXC_SCRIPT" | sed \
+          -e 's|\(pveam list "$TEMPLATE_STORAGE" |\)|\1grep -v "13\\.1" \||g' \
+          -e 's|\(pveam available -section system |\)|\1grep -v "13\\.1" \||g' \
+          -e 's|\(sed -n "s/.*\\)|\(grep -v "13\\.1" \| sed -n "s/.*\\)|g')
+        echo "DEBUG: Applied fallback filter for 13.1 templates" >&2
       else
         echo "DEBUG: Python patching successful, script length: ${#PATCHED_SCRIPT}" >&2
       fi
@@ -1325,10 +1346,12 @@ PYTHON_SCRIPT
     pvesm status | grep -E "(Samsung500|local)"
 
     echo -e "\nChecking template..."
-    TEMPLATE_CHECK=$(pveam list local | grep -E "debian-13.*standard" | tail -1)
+    TEMPLATE_CHECK=$(pveam list local | grep -E "debian-13.*standard" | grep -v "13\.1" | tail -1)
     TEMPLATE_NAME=""
     if [ -n "$TEMPLATE_CHECK" ]; then
       TEMPLATE_NAME=$(echo $TEMPLATE_CHECK | awk '{print $1}')
+      # Remove storage prefix if present (e.g., "local:vztmpl/template" -> "template")
+      TEMPLATE_NAME=$(echo $TEMPLATE_NAME | sed 's|.*/||')
       echo -e "Template found: ${GN}$TEMPLATE_CHECK${CL}"
       TEMPLATE_PATH=$(pvesm path local:vztmpl/$TEMPLATE_NAME 2>/dev/null || echo "/var/lib/vz/template/cache/$TEMPLATE_NAME")
       if [ -f "$TEMPLATE_PATH" ]; then
@@ -1355,10 +1378,12 @@ PYTHON_SCRIPT
     if ! pct list | grep -q "^$CTID"; then
       if [ -n "$TEMPLATE_NAME" ]; then
         echo -e "\nAttempting manual pct create to see actual error..."
-        echo -e "${YW}Running: pct create $CTID local:vztmpl/$TEMPLATE_NAME -rootfs Samsung500:$PCT_DISK_SIZE -features nesting=1 -hostname $HN -onboot 1 -cores $CORE_COUNT -memory $RAM_SIZE -unprivileged $CT_TYPE${CL}\n"
+        # Fix template name - remove storage prefix if present
+        TEMPLATE_NAME_CLEAN=$(echo "$TEMPLATE_NAME" | sed 's|.*/||' | sed 's|local:vztmpl/||')
+        echo -e "${YW}Running: pct create $CTID local:vztmpl/$TEMPLATE_NAME_CLEAN -rootfs Samsung500:$PCT_DISK_SIZE -features nesting=1 -hostname $HN -onboot 1 -cores $CORE_COUNT -memory $RAM_SIZE -unprivileged $CT_TYPE${CL}\n"
 
         # Try manual creation to see the actual error
-        MANUAL_OUTPUT=$(pct create $CTID local:vztmpl/$TEMPLATE_NAME \
+        MANUAL_OUTPUT=$(pct create $CTID local:vztmpl/$TEMPLATE_NAME_CLEAN \
           -rootfs Samsung500:$PCT_DISK_SIZE \
           -features nesting=1 \
           -hostname $HN \
